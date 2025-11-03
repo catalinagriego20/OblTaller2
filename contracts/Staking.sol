@@ -38,11 +38,11 @@ contract Staking {
         dao = _dao;
     }
 
-    function stakeVote(uint256 amount, uint256 proposalId) external {
+    function stakeVote(address user, uint256 amount, uint256 proposalId) external onlyDAO{
         require(IDAO(dao).isValidProposal(proposalId), "Invalid proposal");
         require(amount > 0, "Invalid amount");
 
-        StakeInfo storage s = _voteStakes[msg.sender][proposalId];
+        StakeInfo storage s = _voteStakes[user][proposalId];
         s.amount += amount;
         s.exists = true;
 
@@ -52,13 +52,13 @@ contract Staking {
             s.unlockAt = newUnlock;
         }
 
-        emit VoteStaked(msg.sender, proposalId, amount, s.unlockAt);
+        emit VoteStaked(user, proposalId, amount, s.unlockAt);
 
-        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        require(token.transferFrom(user, address(this), amount), "Transfer failed");
     }
 
-    function unstakeVote(uint256 amount, uint256 proposalId) external {
-        StakeInfo storage s = _voteStakes[msg.sender][proposalId];
+    function unstakeVote(address user, uint256 amount, uint256 proposalId) external onlyDAO {
+        StakeInfo storage s = _voteStakes[user][proposalId];
         require(s.exists, "No vote stake");
         require(amount > 0, "Invalid amount");
         require(s.amount >= amount, "Insufficient funds");
@@ -67,26 +67,26 @@ contract Staking {
         s.amount -= amount;
         if (s.amount == 0) s.exists = false;
 
-        emit VoteUnstaked(msg.sender, proposalId, amount);
+        emit VoteUnstaked(user, proposalId, amount);
 
-        require(token.transfer(msg.sender, amount), "Transfer failed");
+        require(token.transfer(user, amount), "Transfer failed");
     }
 
-    function voteStakeOf(address user, uint256 proposalId) external view returns (uint256) {
+    function voteStakeOf(address user, uint256 proposalId) external onlyDAO view returns (uint256){
         require(_voteStakes[user][proposalId].exists, "No vote stake");
         return _voteStakes[user][proposalId].amount;
     }
 
-    function voteUnlockTimeOf(address user, uint256 proposalId) external view returns (uint256) {
+    function voteUnlockTimeOf(address user, uint256 proposalId) external onlyDAO view returns (uint256){
         require(_voteStakes[user][proposalId].exists, "No vote stake");
         return _voteStakes[user][proposalId].unlockAt;
     }
 
-    function stakeProposal(uint256 amount, uint256 proposalId) external {
+    function stakeProposal(address user, uint256 amount, uint256 proposalId) external onlyDAO{
         require(IDAO(dao).isValidProposal(proposalId), "Invalid proposal");
         require(amount > 0, "Invalid amount");
 
-        StakeInfo storage s = _proposalStakes[msg.sender][proposalId];
+        StakeInfo storage s = _proposalStakes[user][proposalId];
         s.amount += amount;
         s.exists = true;
 
@@ -96,13 +96,13 @@ contract Staking {
             s.unlockAt = newUnlock;
         }
 
-        emit ProposalStaked(msg.sender, proposalId, amount, s.unlockAt);
+        emit ProposalStaked(user, proposalId, amount, s.unlockAt);
 
-        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        require(token.transferFrom(user, address(this), amount), "Transfer failed");
     }
 
-    function unstakeProposal(uint256 amount, uint256 proposalId) external {
-        StakeInfo storage s = _proposalStakes[msg.sender][proposalId];
+    function unstakeProposal(address user, uint256 amount, uint256 proposalId) external onlyDAO{
+        StakeInfo storage s = _proposalStakes[user][proposalId];
         require(s.exists, "No proposal stake");
         require(amount > 0, "Invalid amount");
         require(s.amount >= amount, "Insufficient funds");
@@ -111,17 +111,17 @@ contract Staking {
         s.amount -= amount;
         if (s.amount == 0) s.exists = false;
 
-        emit ProposalUnstaked(msg.sender, proposalId, amount);
+        emit ProposalUnstaked(user, proposalId, amount);
 
-        require(token.transfer(msg.sender, amount), "Transfer failed");
+        require(token.transfer(user, amount), "Transfer failed");
     }
 
-    function proposalStakeOf(address user, uint256 proposalId) external view returns (uint256) {
+    function proposalStakeOf(address user, uint256 proposalId) external onlyDAO view returns (uint256){
         require(_proposalStakes[user][proposalId].exists, "No proposal stake");
         return _proposalStakes[user][proposalId].amount;
     }
 
-    function proposalUnlockTimeOf(address user, uint256 proposalId) external view returns (uint256) {
+    function proposalUnlockTimeOf(address user, uint256 proposalId) external onlyDAO view returns (uint256){
         require(_proposalStakes[user][proposalId].exists, "No proposal stake");
         return _proposalStakes[user][proposalId].unlockAt;
     }

@@ -10,15 +10,16 @@ interface IMintableERC20 {
 }
 
 interface IStakingView {
-    enum Bucket { Vote, Proposal }
-    function stakeOf(address user, Bucket bucket) external view returns (uint256);
+    function stakeVote(uint256 amount, uint256 proposalId) external view returns (uint256);
+    function stakeProposal(uint256 amount, uint256 proposalId) external view returns (uint256);
+    function voteStakeOf(address user, uint256 proposalId) external view returns (uint256);
+    function proposalStakeOf(address user, uint256 proposalId) external view returns (uint256);
 }
 
 contract DAO is Ownable {
     using MathUtils for uint256;
-
     enum ProposalStatus { ACTIVE, ACCEPTED, REJECTED }
-
+    
     struct Proposal {
         uint256 id;
         string title;
@@ -32,37 +33,28 @@ contract DAO is Ownable {
         mapping(address => bool) voteChoice;
     }
 
-    // -------- Contratos externos --------
     IMintableERC20 public token;
     uint8 public tokenDecimals;      // cacheo de decimals para evitar llamadas externas en checks
     address public staking; // IStakingView compatible
 
-    // -------- Seguridad / operación --------
     address public panicWallet;
     bool public isPanicked;
 
-    // -------- Parámetros DAO --------
-    uint256 public priceWeiPerToken;      // precio en wei por token (18 dec)
-    uint256 public minStakeForVote;       // tokens mínimos en bucket Vote
-    uint256 public minStakeForProposal;   // tokens mínimos en bucket Proposal
-    uint256 public votingPeriod;          // en segundos
-    uint256 public tokensPerVotingPower;  // cuántos tokens == 1 VP (modo lineal)
-    uint256 public lockTimeSeconds;       // tiempo de lock leído por Staking vía IDAO.lockTime()
+    uint256 public priceWeiPerToken;
+    uint256 public minStakeForVote;
+    uint256 public minStakeForProposal;
+    uint256 public votingPeriod;
+    uint256 public tokensPerVotingPower;
+    uint256 public lockTimeSeconds;
 
-    bool public quadraticVotingEnabled;   // Conjunto A toggle
+    bool public quadraticVotingEnabled;
 
-    // (opcional) métricas internas que pueden servir como efectos antes de interacciones
-    uint256 public totalWeiReceived;
-    uint256 public totalTokensMinted;
-
-    // -------- Propuestas --------
     uint256 public proposalCount;
     mapping(uint256 => Proposal) private _proposals;
 
-    // -------- Eventos --------
     event PanicSet(address indexed wallet);
-    event PanicTriggered(address indexed by);
-    event TranquilidadRestored(address indexed by);
+    event PanicTriggered();
+    event TranquilityRestored();
 
     event ParamsUpdated(
         uint256 priceWeiPerToken,
@@ -83,26 +75,24 @@ contract DAO is Ownable {
     event Voted(uint256 indexed id, address indexed voter, bool inFavor, uint256 power);
     event ProposalFinalized(uint256 indexed id, ProposalStatus status);
 
-    // -------- Modifiers --------
     modifier notPanicked() {
-        require(!isPanicked, "DAO: panic");
+        require(!isPanicked, "Panic mode active");
         _;
     }
 
     modifier panicConfigured() {
-        require(panicWallet != address(0), "DAO: panic wallet not set");
+        require(panicWallet != address(0), "Invalid panic wallet");
         _;
     }
 
     modifier onlyStakingSet() {
-        require(staking != address(0), "DAO: staking not set");
+        require(staking != address(0), "Invalid staking");
         _;
     }
 
-    // -------- Constructor --------
     constructor(
         address _token,
-        address _staking,           // puede venir en cero y setearse luego
+        address _staking,
         address _multisigOwner,
         uint256 _priceWeiPerToken,
         uint256 _minStakeVote,
@@ -111,30 +101,33 @@ contract DAO is Ownable {
         uint256 _tokensPerVotingPower,
         uint256 _lockTimeSeconds
     ) {
-        require(_token != address(0), "DAO: token zero");
-        require(_multisigOwner != address(0), "DAO: owner zero");
-        require(_priceWeiPerToken > 0, "DAO: invalid price");
-        require(_tokensPerVotingPower > 0, "DAO: invalid tokensPerVP");
+        require(_token != address(0), "Invalid token");
+        require(_multisigOwner != address(0), "Invalid owner");
+        require(_priceWeiPerToken > 0, "Invalid price");
+        require(_tokensPerVotingPower > 0, "Invalid tokensPerVP");
+        require(_lockTimeSeconds >= 0, "Invalid lock time");
+        require(_minStakeVote >= 0, "Invalid min stake vote");
+        require(_minStakeProposal >= 0, "Invalid min stake proposal");
+        require(_votingPeriodSeconds > 0, "Invalid voting period");
 
         token = IMintableERC20(_token);
-        // cacheo decimals en constructor (llamada externa permitida aquí)
         tokenDecimals = token.decimals();
 
         staking = _staking;
 
         _transferOwnership(_multisigOwner);
 
-        priceWeiPerToken     = _priceWeiPerToken;
-        minStakeForVote      = _minStakeVote;
-        minStakeForProposal  = _minStakeProposal;
-        votingPeriod         = _votingPeriodSeconds;
+        priceWeiPerToken = _priceWeiPerToken;
+        minStakeForVote = _minStakeVote;
+        minStakeForProposal = _minStakeProposal;
+        votingPeriod = _votingPeriodSeconds;
         tokensPerVotingPower = _tokensPerVotingPower;
-        lockTimeSeconds      = _lockTimeSeconds;
+        lockTimeSeconds = _lockTimeSeconds;
     }
 
-    // =========================================================
-    //                  ADMIN (solo multisig owner)
-    // =========================================================
+    function lockTime() external view returns (uint256) {
+        return lockTimeSeconds;
+    }
 
     function setPanicWallet(address _wallet) external onlyOwner {
         panicWallet = _wallet;
@@ -149,15 +142,19 @@ contract DAO is Ownable {
         uint256 _tokensPerVotingPower,
         uint256 _lockTimeSeconds
     ) external onlyOwner {
-        require(_priceWeiPerToken > 0, "DAO: invalid price");
-        require(_tokensPerVotingPower > 0, "DAO: invalid tokensPerVP");
+        require(_priceWeiPerToken > 0, "Invalid price");
+        require(_tokensPerVotingPower > 0, "Invalid tokensPerVP");
+        require(_minStakeVote >= 0, "Invalid min stake vote");
+        require(_minStakeProposal >= 0, "Invalid min stake proposal");
+        require(_votingPeriodSeconds > 0, "Invalid voting period");
+        require(_lockTimeSeconds >= 0, "Invalid lock time");
 
-        priceWeiPerToken     = _priceWeiPerToken;
-        minStakeForVote      = _minStakeVote;
-        minStakeForProposal  = _minStakeProposal;
-        votingPeriod         = _votingPeriodSeconds;
+        priceWeiPerToken = _priceWeiPerToken;
+        minStakeForVote = _minStakeVote;
+        minStakeForProposal = _minStakeProposal;
+        votingPeriod = _votingPeriodSeconds;
         tokensPerVotingPower = _tokensPerVotingPower;
-        lockTimeSeconds      = _lockTimeSeconds;
+        lockTimeSeconds = _lockTimeSeconds;
 
         emit ParamsUpdated(
             _priceWeiPerToken,
@@ -175,94 +172,65 @@ contract DAO is Ownable {
     }
 
     function setStaking(address newStaking) external onlyOwner {
-        require(newStaking != address(0), "DAO: zero staking");
+        require(newStaking != address(0), "Invalid staking");
         address old = staking;
         staking = newStaking;
         emit StakingChanged(old, newStaking);
     }
 
     function setToken(address newToken) external onlyOwner {
-        require(newToken != address(0), "DAO: zero token");
+        require(newToken != address(0), "Invalid token");
         address old = address(token);
         token = IMintableERC20(newToken);
-        // actualizo cache de decimals; llamada externa permitida en admin function
         tokenDecimals = token.decimals();
         emit TokenChanged(old, newToken);
     }
 
-    // =========================================================
-    //                  PANICO / TRANQUILIDAD
-    // =========================================================
-
-    function panico() external panicConfigured {
-        require(msg.sender == panicWallet, "DAO: only panic wallet");
+    function panic() external panicConfigured {
+        require(msg.sender == panicWallet, "Only panic wallet can trigger panic");
         isPanicked = true;
         emit PanicTriggered(msg.sender);
     }
 
-    function tranquilidad() external panicConfigured {
-        require(msg.sender == panicWallet, "DAO: only panic wallet");
+    function tranquility() external panicConfigured {
+        require(msg.sender == panicWallet, "Only panic wallet can restore tranquility");
         isPanicked = false;
-        emit TranquilidadRestored(msg.sender);
+        emit TranquilityRestored(msg.sender);
     }
 
-    // =========================================================
-    //                  COMPRA DE TOKENS
-    // =========================================================
-
-    receive() external payable {
-        _buyTokens(msg.sender, msg.value);
-    }
-
-    // ya no usamos nonReentrant; seguimos CHECKS-EFFECTS-INTERACTIONS en _buyTokens
     function buyTokens() external payable notPanicked panicConfigured {
         _buyTokens(msg.sender, msg.value);
     }
 
-    /**
-     * @dev CHECKS -> EFFECTS -> INTERACTIONS
-     * - Checks: validaciones iniciales (weiAmount, price).
-     * - Effects: computos internos y actualización de métricas internas y emisión de evento.
-     * - Interactions: llamada externa a token.mint() (último paso).
-     */
     function _buyTokens(address buyer, uint256 weiAmount) internal {
-        // --- CHECKS ---
-        require(weiAmount > 0, "DAO: no ETH");
-        require(priceWeiPerToken > 0, "DAO: price not set");
-
-        // uso tokenDecimals cacheado (evita llamadas externas en esta fase)
+        // Checks
+        require(weiAmount > 0, "No ETH sent");
+        require(priceWeiPerToken > 0, "Price not set");
+    
         uint8 dec = tokenDecimals;
         uint256 tokensOut = (weiAmount * (10 ** uint256(dec))) / priceWeiPerToken;
-        require(tokensOut > 0, "DAO: too little ETH");
+        require(tokensOut > 0, "Too little ETH");
 
-        // --- EFFECTS ---
-        // actualizo métricas internas antes de la interacción externa
-        totalWeiReceived += weiAmount;
-        totalTokensMinted += tokensOut;
-
-        // emito el evento como efecto; si el mint revierte, todo se revierte y el evento no queda
+        // Effects
         emit TokensPurchased(buyer, weiAmount, tokensOut);
 
-        // --- INTERACTION (último paso) ---
+        // Interaction
         token.mint(buyer, tokensOut);
     }
 
-    // =========================================================
-    //                  PROPUESTAS / VOTACION
-    // =========================================================
-
-    function createProposal(string memory title, string memory description)
+    function createProposal(string memory title, string memory description, uint256 stakingAmount)
         external
         notPanicked
         panicConfigured
         onlyStakingSet
     {
-        // CHECK: lectura externa de staking para validar (solo lectura)
-        uint256 st = IStakingView(staking).stakeOf(msg.sender, IStakingView.Bucket.Proposal);
-        require(st >= minStakeForProposal, "DAO: insufficient proposal stake");
+        // Checks
+        require(stakingAmount >= minStakeForProposal, "Insufficient proposal stake");
+        require(stakingAmount > 0, "Invalid staking amount");
 
-        // EFFECTS: cambios de estado locales
+        // Effects
         uint256 id = ++proposalCount;
+
         Proposal storage p = _proposals[id];
         p.id = id;
         p.creator = msg.sender;
@@ -272,6 +240,9 @@ contract DAO is Ownable {
         p.status = ProposalStatus.ACTIVE;
 
         emit ProposalCreated(id, msg.sender, title);
+
+        // Interactions
+        IStaking(staking).stakeProposal(msg.sender, stakingAmount, id);
     }
 
     function _isActive(uint256 id) internal view returns (bool) {
@@ -281,30 +252,27 @@ contract DAO is Ownable {
         return true;
     }
 
-    function vote(uint256 id, bool inFavor)
+    function vote(uint256 id, bool inFavor, uint256 stakingAmount)
         external
         notPanicked
         panicConfigured
         onlyStakingSet
     {
+        require(stakingAmount >= minStakeForProposal, "Insufficient voting stake");
+        require(stakingAmount > 0, "Invalid staking amount");
+
         Proposal storage p = _proposals[id];
-        require(p.id != 0, "DAO: invalid proposal");
-        require(_isActive(id), "DAO: not active");
-        require(!p.voted[msg.sender], "DAO: already voted");
+        require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
+        require(_isActive(id), "Not active");
 
-        // CHECK: lectura externa de staking para validar stake de voto
-        uint256 st = IStakingView(staking).stakeOf(msg.sender, IStakingView.Bucket.Vote);
-        require(st >= minStakeForVote, "DAO: insufficient vote stake");
-
-        // EFFECTS: calculo y modificación de estado interno
         uint256 vp;
         if (quadraticVotingEnabled) {
-            uint256 base = st / tokensPerVotingPower;
+            uint256 base = stakingAmount / tokensPerVotingPower;
             vp = base.isqrt();
         } else {
-            vp = st / tokensPerVotingPower;
+            vp = stakingAmount / tokensPerVotingPower;
         }
-        require(vp > 0, "DAO: zero voting power");
+        require(vp > 0, "Zero voting power");
 
         p.voted[msg.sender] = true;
         p.voteChoice[msg.sender] = inFavor;
@@ -314,31 +282,37 @@ contract DAO is Ownable {
         else p.votesAgainst += vp;
 
         emit Voted(id, msg.sender, inFavor, vp);
-        // no hay interactions externas en esta función -> CEI respetado
+        
+        IStaking(staking).stakeVote(msg.sender, stakingAmount, id);
     }
 
     function finalize(uint256 id) external notPanicked panicConfigured {
         Proposal storage p = _proposals[id];
-        require(p.id != 0, "DAO: invalid proposal");
-        require(p.status == ProposalStatus.ACTIVE, "DAO: not active");
-        require(block.timestamp > p.startTime + votingPeriod, "DAO: voting period not ended");
+        require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
+        require(p.status == ProposalStatus.ACTIVE, "Not active");
+        require(block.timestamp > p.startTime + votingPeriod, "Voting period not ended");
 
-        // EFFECTS: determinación del resultado y cambio de estado
+        // Effects
         if (p.votesFor > p.votesAgainst) {
             p.status = ProposalStatus.ACCEPTED;
-        } else if (p.votesAgainst > p.votesFor) {
-            p.status = ProposalStatus.REJECTED;
         } else {
-            p.status = ProposalStatus.EXPIRED; // empate
+            p.status = ProposalStatus.REJECTED;
         }
 
         emit ProposalFinalized(id, p.status);
     }
 
-    // =========================================================
-    //                  GETTERS PARA UI
-    // =========================================================
+    function isValidProposal(uint256 proposalId) external view returns (bool) {
+        Proposal storage p = proposals[proposalId];
+        return (p.exists && p.creator == msg.sender && !p.closed);
+    }
 
+    function isValidVote(uint256 proposalId) external view returns (bool) {
+        Proposal storage p = proposals[proposalId];
+        return (p.exists && p.active && !p.closed);
+    }
+
+    // Gets para frontend
     function getProposal(uint256 id)
         external
         view
@@ -354,7 +328,7 @@ contract DAO is Ownable {
         )
     {
         Proposal storage p = _proposals[id];
-        require(p.id != 0, "DAO: invalid proposal");
+        require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
         return (p.id, p.creator, p.title, p.description, p.votesFor, p.votesAgainst, p.startTime, p.status);
     }
 
@@ -364,7 +338,7 @@ contract DAO is Ownable {
         returns (address[] memory voters, bool[] memory inFavor)
     {
         Proposal storage p = _proposals[id];
-        require(p.id != 0, "DAO: invalid proposal");
+        require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
         uint256 n = p.voters.length;
         voters = new address[](n);
         inFavor = new bool[](n);
@@ -381,7 +355,7 @@ contract DAO is Ownable {
         returns (uint256[] memory)
     {
         if (toId == 0 || toId > proposalCount) toId = proposalCount;
-        require(fromId >= 1 && fromId <= toId, "DAO: invalid range");
+        require(fromId >= 1 && fromId <= toId, "Invalid range");
 
         uint256 count;
         for (uint256 i = fromId; i <= toId; i++) {
@@ -398,15 +372,5 @@ contract DAO is Ownable {
             }
         }
         return ids;
-    }
-
-    // =========================================================
-    //          IDAO (usado por Staking para lockTime)
-    // =========================================================
-
-    // si creás un Staking que llame a DAO.lockTime() éste debe implementar la interfaz;
-    // acá devolvemos el lockTimeSeconds
-    function lockTime() external view returns (uint256) {
-        return lockTimeSeconds;
     }
 }
