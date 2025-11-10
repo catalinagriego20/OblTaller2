@@ -5,7 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DAOToken is ERC20, Ownable {
-    constructor() ERC20("DAO Token", "DAOT") {}
+    constructor(address initialOwner) 
+        ERC20("DAO Token", "DAOT") 
+        Ownable(initialOwner) 
+    {}
 
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);

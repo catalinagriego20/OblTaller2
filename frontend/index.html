@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TaskTrackPro - DAO dApp POC (Frontend simple)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body { padding: 1.5rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; }
+    .card-small { min-height: 120px; }
+    .proposal-card { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-3">DAO — Frontend POC (HTML + Bootstrap)</h1>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <div class="card card-small">
+          <div class="card-body">
+            <h5 class="card-title">Wallet</h5>
+            <p id="addr" class="mono">No conectado</p>
+            <p id="ethBalance">— ETH</p>
+            <button id="btnConnect" class="btn btn-primary btn-sm">Conectar Wallet (Metamask / WalletConnect)</button>
+            <button id="btnDisconnect" class="btn btn-outline-secondary btn-sm ms-2">Desconectar</button>
+          </div>
+        </div>
+
+        <div class="card mt-2">
+          <div class="card-body">
+            <h5 class="card-title">Token</h5>
+            <p>DAO Token balance: <span id="tokenBalance">—</span></p>
+            <div class="input-group mb-2">
+              <input id="buyEth" type="number" step="0.0001" min="0" class="form-control" placeholder="ETH a pagar">
+              <button id="btnBuy" class="btn btn-success">Comprar tokens</button>
+            </div>
+            <small class="text-muted">La dApp llama a <code>buyTokens()</code> del contrato DAO.</small>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="col-md-6">
+        <div class="card card-small">
+          <div class="card-body">
+            <h5 class="card-title">Operaciones rápidas</h5>
+            <p>Owner / multisig actions (si tu wallet es owner o panic wallet):</p>
+            <div class="d-grid gap-2 d-md-block">
+              <button id="btnToggleVotingMode" class="btn btn-warning btn-sm">Toggle Voting Mode</button>
+              <button id="btnPanic" class="btn btn-danger btn-sm">PÁNICO</button>
+              <button id="btnTranquility" class="btn btn-success btn-sm">TRANQUILIDAD</button>
+            </div>
+            <hr/>
+            <small id="contractInfo" class="text-muted">Contrato: <span class="mono" id="contractAddr">--</span></small>
+          </div>
+        </div>
+
+        <div class="card mt-2">
+          <div class="card-body">
+            <h5 class="card-title">Crear propuesta</h5>
+            <input id="propTitle" class="form-control mb-2" placeholder="Título"/>
+            <textarea id="propDesc" class="form-control mb-2" placeholder="Descripción"></textarea>
+            <input id="propStake" type="number" step="1" class="form-control mb-2" placeholder="Staking requerido (tokens)"/>
+            <button id="btnCreateProp" class="btn btn-primary">Crear propuesta</button>
+            <div id="createMsg" class="mt-2"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="row mb-2">
+      <div class="col-12">
+        <h3>Propuestas</h3>
+        <div class="mb-2">
+          <select id="filterStatus" class="form-select w-auto d-inline-block">
+            <option value="ALL">Todas</option>
+            <option value="ACTIVE">ACTIVAS</option>
+            <option value="ACCEPTED">ACEPTADAS</option>
+            <option value="REJECTED">RECHAZADAS</option>
+          </select>
+          <button id="btnRefresh" class="btn btn-outline-primary btn-sm ms-2">Refrescar</button>
+        </div>
+        <div id="proposalsList"></div>
+      </div>
+    </div>
+
+    <footer class="mt-3">
+      <small class="text-muted">Frontend minimal — reemplaza DAO_ADDRESS y DAO_ABI al pie del archivo.</small>
+    </footer>
+  </div>
+
+  <!-- Librerías -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+  <script src="https://unpkg.com/@web3modal/standalone@2.8.0/dist/index.umd.js"></script>
+  <script>
+    (async function(){
+      // ---------- CONFIG: Cambiá esto ----------
+      const DAO_ADDRESS = "REEMPLAZAR_POR_DIRECCION_DAO"; // <-- <<<<<<<<<<<<<<<<<<<<<<<
+      const DAO_ABI = [ 
+        // ABI mínimo necesario (completá con tu ABI completo para todas las funciones que quieras usar)
+        "function buyTokens() payable",
+        "function token() view returns (address)",
+        "function priceWeiPerToken() view returns (uint256)",
+        "function getAllProposals() view returns (tuple(uint256 id,address creator,string title,string description,uint256 votesFor,uint256 votesAgainst,uint256 startTime,uint8 status,tuple(address voter,bool choice)[] voters)[] )",
+        "function getProposal(uint256) view returns (uint256,address,string,string,uint256,uint256,uint256,uint8)",
+        "function createProposal(string,string,uint256)",
+        "function vote(uint256,bool,uint256)",
+        "function unstakeVote(uint256)",
+        "function unstakeProposal(uint256)",
+        "function panic()",
+        "function tranquility()",
+        "function toggleVotingMode()",
+        "function balanceOf(address) view returns (uint256)", // en caso de que token sea directamente llamado: notar que DAO no tiene balanceOf; es del ERC20 token
+        "function owner() view returns (address)",
+        "function panicWallet() view returns (address)",
+        "function token() view returns (address)"
+      ];
+      // -----------------------------------------
+
+      // Estado
+      let provider; // ethers provider
+      let signer;
+      let web3Modal;
+      let contract;
+
+      const addrEl = document.getElementById("addr");
+      const ethBalanceEl = document.getElementById("ethBalance");
+      const tokenBalanceEl = document.getElementById("tokenBalance");
+      const contractAddrEl = document.getElementById("contractAddr");
+      contractAddrEl.textContent = DAO_ADDRESS;
+      document.getElementById("contractInfo").style.display = "block";
+
+      // UI refs
+      const btnConnect = document.getElementById("btnConnect");
+      const btnDisconnect = document.getElementById("btnDisconnect");
+      const btnBuy = document.getElementById("btnBuy");
+      const buyEth = document.getElementById("buyEth");
+      const btnRefresh = document.getElementById("btnRefresh");
+      const proposalsList = document.getElementById("proposalsList");
+      const filterStatus = document.getElementById("filterStatus");
+      const btnCreateProp = document.getElementById("btnCreateProp");
+      const propTitle = document.getElementById("propTitle");
+      const propDesc = document.getElementById("propDesc");
+      const propStake = document.getElementById("propStake");
+      const createMsg = document.getElementById("createMsg");
+      const btnToggleVotingMode = document.getElementById("btnToggleVotingMode");
+      const btnPanic = document.getElementById("btnPanic");
+      const btnTranquility = document.getElementById("btnTranquility");
+
+      // Init Web3Modal (Metamask + WalletConnect)
+      function initWeb3Modal() {
+        const web3ModalOpts = {
+          projectId: "demo", // no obligatorio: para integraciones más complejas se usa un projectId real
+          standaloneChains: [1, 5, 137, 80001] // chains allowed for providers; ajustar según testnet (ej: goerli, sepolia)
+        };
+        web3Modal = new window.Web3ModalStandalone.default(web3ModalOpts);
+      }
+      initWeb3Modal();
+
+      async function connect() {
+        try {
+          const instance = await web3Modal.connect();
+          provider = new ethers.BrowserProvider(instance);
+          signer = await provider.getSigner();
+          const address = await signer.getAddress();
+          addrEl.textContent = address;
+          contract = new ethers.Contract(DAO_ADDRESS, DAO_ABI, signer);
+          await refreshBalances();
+          await loadProposals();
+          subscribeToProviderEvents(instance);
+        } catch (err) {
+          console.error(err);
+          alert("Error conectando wallet: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      function subscribeToProviderEvents(instance) {
+        // Web3Modal standalone instance provides events depending provider; we attempt common ones:
+        if (instance.on) {
+          instance.on("accountsChanged", (accounts) => {
+            if (accounts.length === 0) disconnect();
+            else { addrEl.textContent = accounts[0]; refreshBalances(); loadProposals(); }
+          });
+          instance.on("chainChanged", (chainId) => {
+            refreshBalances();
+            loadProposals();
+          });
+        }
+      }
+
+      async function disconnect() {
+        try {
+          if (web3Modal) await web3Modal.clearState();
+        } catch(e){}
+        provider = null;
+        signer = null;
+        contract = null;
+        addrEl.textContent = "No conectado";
+        ethBalanceEl.textContent = "— ETH";
+        tokenBalanceEl.textContent = "—";
+        proposalsList.innerHTML = "";
+      }
+
+      async function refreshBalances() {
+        if (!signer) return;
+        try {
+          const address = await signer.getAddress();
+          const bal = await provider.getBalance(address);
+          ethBalanceEl.textContent = ethers.formatEther(bal) + " ETH";
+          // token balance: intenta leer token address desde contrato si existe
+          try {
+            const tokenAddr = await contract.token();
+            const tokenAbi = ["function balanceOf(address) view returns (uint256)", "function decimals() view returns (uint8)", "function symbol() view returns (string)"];
+            const tokenContract = new ethers.Contract(tokenAddr, tokenAbi, provider);
+            const dec = await tokenContract.decimals().catch(()=>18);
+            const tb = await tokenContract.balanceOf(address);
+            const symbol = await tokenContract.symbol().catch(()=> "TOKEN");
+            const human = Number(ethers.formatUnits(tb, dec));
+            tokenBalanceEl.textContent = `${human} ${symbol}`;
+          } catch (err) {
+            tokenBalanceEl.textContent = "Imposible leer token (revisar ABI)";
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function buyTokens() {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        const eth = buyEth.value;
+        if (!eth || Number(eth) <= 0) return alert("Ingresá cantidad de ETH");
+        try {
+          const tx = await contract.buyTokens({ value: ethers.parseEther(String(eth)) });
+          await tx.wait();
+          alert("Compra enviada (tx enviada).");
+          await refreshBalances();
+        } catch (err) {
+          console.error(err);
+          alert("Error al comprar: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      function statusFromUint8(n) {
+        // en el contrato ProposalStatus { ACTIVE, ACCEPTED, REJECTED } -> 0,1,2
+        if (n === 0) return "ACTIVE";
+        if (n === 1) return "ACCEPTED";
+        return "REJECTED";
+      }
+
+      async function loadProposals() {
+        if (!contract) return;
+        proposalsList.innerHTML = "<div class='text-muted'>Cargando propuestas...</div>";
+        try {
+          const arr = await contract.getAllProposals();
+          // arr es un array de structs; adaptar si devuelve tipos diferentes
+          const filter = filterStatus.value;
+          proposalsList.innerHTML = "";
+          if (!arr || arr.length === 0) {
+            proposalsList.innerHTML = "<div class='text-muted'>No hay propuestas</div>";
+            return;
+          }
+          for (let i=0;i<arr.length;i++) {
+            const p = arr[i];
+            // Según ABI configurado, p.status puede venir como uint8 o string
+            const id = Number(p.id);
+            const status = typeof p.status === "number" ? statusFromUint8(p.status) : String(p.status);
+            if (filter !== "ALL" && filter !== status) continue;
+            const startTs = Number(p.startTime) * 1000;
+            const voters = (p.voters || []).map(v => ({voter: v.voter, choice: v.choice}));
+            const card = document.createElement("div");
+            card.className = "card proposal-card";
+            card.innerHTML = `
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                  <h5 class="card-title">#${id} — ${escapeHtml(p.title)}</h5>
+                  <span class="badge ${status==='ACTIVE'?'bg-primary':status==='ACCEPTED'?'bg-success':'bg-danger'}">${status}</span>
+                </div>
+                <p class="card-text">${escapeHtml(p.description)}</p>
+                <p class="small text-muted">Creador: ${p.creator} — Inicio: ${new Date(startTs).toLocaleString()}</p>
+                <p>Votos: Favor <strong>${String(p.votesFor)}</strong> — Contra <strong>${String(p.votesAgainst)}</strong></p>
+                <div id="voters-${id}"><small>Votantes: ${voters.length}</small></div>
+                <div class="mt-2">
+                  <input id="stakeVote-${id}" class="form-control form-control-sm w-50 d-inline-block" placeholder="staking tokens (ej 1000)"/>
+                  <button data-id="${id}" class="btnVote btn btn-sm btn-success ms-1">Votar A favor</button>
+                  <button data-id="${id}" class="btnVoteAgainst btn btn-sm btn-danger ms-1">Votar En contra</button>
+                  <button data-id="${id}" class="btnUnstakeVote btn btn-sm btn-outline-secondary ms-1">Unstake Vote</button>
+                  <button data-id="${id}" class="btnUnstakeProp btn btn-sm btn-outline-secondary ms-1">Unstake Proposal</button>
+                </div>
+              </div>`;
+            proposalsList.appendChild(card);
+
+            // rellenar votantes
+            const votersDiv = card.querySelector(`#voters-${id}`);
+            if (voters.length > 0) {
+              const list = document.createElement("ul");
+              list.className = "small";
+              voters.forEach(v => {
+                const li = document.createElement("li");
+                li.textContent = `${v.voter} — ${v.choice ? "A favor" : "En contra"}`;
+                list.appendChild(li);
+              });
+              votersDiv.appendChild(list);
+            }
+
+            // eventos botones
+            card.querySelector(".btnVote").addEventListener("click", async (ev) => {
+              const id = Number(ev.target.getAttribute("data-id"));
+              const val = card.querySelector(`#stakeVote-${id}`).value;
+              await voteProposal(id, true, val);
+            });
+            card.querySelector(".btnVoteAgainst").addEventListener("click", async (ev) => {
+              const id = Number(ev.target.getAttribute("data-id"));
+              const val = card.querySelector(`#stakeVote-${id}`).value;
+              await voteProposal(id, false, val);
+            });
+            card.querySelector(".btnUnstakeVote").addEventListener("click", async (ev) => {
+              const id = Number(ev.target.getAttribute("data-id"));
+              await unstakeVote(id);
+            });
+            card.querySelector(".btnUnstakeProp").addEventListener("click", async (ev) => {
+              const id = Number(ev.target.getAttribute("data-id"));
+              await unstakeProposal(id);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          proposalsList.innerHTML = "<div class='text-danger'>Error cargando propuestas (revisá ABI y dirección del contrato).</div>";
+        }
+      }
+
+      async function voteProposal(id, inFavor, stakingAmount) {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        if (!stakingAmount || Number(stakingAmount) <= 0) return alert("Ingresá staking amount (tokens)");
+        try {
+          const tx = await contract.vote(id, inFavor, ethers.parseUnits(String(stakingAmount), 0)); // asume tokens enteros; adaptá si usas decimals
+          await tx.wait();
+          alert("Voto enviado");
+          await loadProposals();
+        } catch (err) {
+          console.error(err);
+          alert("Error votando: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      async function unstakeVote(id) {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        try {
+          const tx = await contract.unstakeVote(id);
+          await tx.wait();
+          alert("Unstake Vote enviado");
+          await loadProposals();
+        } catch (err) {
+          console.error(err);
+          alert("Error unstakeVote: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      async function unstakeProposal(id) {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        try {
+          const tx = await contract.unstakeProposal(id);
+          await tx.wait();
+          alert("Unstake Proposal enviado");
+        } catch (err) {
+          console.error(err);
+          alert("Error unstakeProposal: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      async function createProposal() {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        const title = propTitle.value.trim();
+        const desc = propDesc.value.trim();
+        const stake = propStake.value;
+        if (!title || !desc) return alert("Título y descripción requeridos");
+        if (!stake || Number(stake) <= 0) return alert("Staking inválido");
+        try {
+          createMsg.innerHTML = "<span class='text-muted'>Enviando transacción...</span>";
+          const tx = await contract.createProposal(title, desc, ethers.parseUnits(String(stake), 0));
+          await tx.wait();
+          createMsg.innerHTML = "<span class='text-success'>Propuesta creada.</span>";
+          propTitle.value = ""; propDesc.value = ""; propStake.value = "";
+          await loadProposals();
+        } catch (err) {
+          console.error(err);
+          createMsg.innerHTML = "<span class='text-danger'>Error: " + (err && err.message ? err.message : err) + "</span>";
+        }
+      }
+
+      async function panic() {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        try {
+          const tx = await contract.panic();
+          await tx.wait();
+          alert("Pánico activado");
+        } catch (err) {
+          console.error(err);
+          alert("Error panic: " + (err && err.message ? err.message : err));
+        }
+      }
+      async function tranquility() {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        try {
+          const tx = await contract.tranquility();
+          await tx.wait();
+          alert("Tranquilidad restaurada");
+        } catch (err) {
+          console.error(err);
+          alert("Error tranquility: " + (err && err.message ? err.message : err));
+        }
+      }
+      async function toggleVotingMode() {
+        if (!contract || !signer) return alert("Conectá wallet primero");
+        try {
+          const tx = await contract.toggleVotingMode();
+          await tx.wait();
+          alert("Modo de votación cambiado");
+        } catch (err) {
+          console.error(err);
+          alert("Error toggling voting mode: " + (err && err.message ? err.message : err));
+        }
+      }
+
+      // util
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str).replace(/[&<>"'`=\/]/g, function(s) {
+          return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'})[s];
+        });
+      }
+
+      // UI events
+      btnConnect.addEventListener("click", connect);
+      btnDisconnect.addEventListener("click", disconnect);
+      btnBuy.addEventListener("click", buyTokens);
+      btnRefresh.addEventListener("click", loadProposals);
+      filterStatus.addEventListener("change", loadProposals);
+      btnCreateProp.addEventListener("click", createProposal);
+      btnPanic.addEventListener("click", panic);
+      btnTranquility.addEventListener("click", tranquility);
+      btnToggleVotingMode.addEventListener("click", toggleVotingMode);
+
+      // refrescar balances periódicamente si está conectado
+      setInterval(async ()=> {
+        if (signer) await refreshBalances();
+      }, 15000);
+
+      // mensaje inicial
+      proposalsList.innerHTML = "<div class='text-muted'>Conectá una wallet para interactuar con la DAO.</div>";
+    })();
+  </script>
+</body>
+</html>
