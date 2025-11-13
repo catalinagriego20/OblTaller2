@@ -9,15 +9,13 @@ contract SimpleMultiSig {
         bytes data;
     }
 
-    // Owner definition
     mapping(address => bool) _isOwner;
     address[] private _owners;
 
-    // Confimation requirements
     uint8 public _requiredConfirmations;
     
     // Confirmations mapping
-    // Each transaction ID will have a list of confirmations - that's why we have a nested mapping.
+    // Each transaction ID have a list of confirmations
     mapping(uint256 => mapping(address => bool)) private _isConfirmed;
     
     Transaction[] private _transactions;
