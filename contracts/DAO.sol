@@ -77,13 +77,12 @@ contract DAO is Ownable {
     event ProposalFinalized(uint256 indexed id, ProposalStatus status);
 
     modifier notPanicked() {
-        require(panicWallet != address(0), "Panic wallet not set");
         require(!isPanicked, "Panic mode active");
         _; 
     }
 
     modifier panicConfigured() {
-        require(panicWallet != address(0), "Invalid panic wallet");
+        require(panicWallet != address(0), "Panic wallet not set");
         _;
     }
 
