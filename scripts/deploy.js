@@ -8,7 +8,7 @@ async function main() {
   // 1) DEPLOY MULTISIG (OWNER DE LA DAO)
   // -----------------------------
   const SimpleMultiSig = await hre.ethers.getContractFactory("SimpleMultiSig");
-  const owners = [deployer.address]; // agregar más addresses si querés multisig real
+  const owners = [deployer.address]; // agregar más addresses
   const requiredConfirmations = 1;
   const multisig = await SimpleMultiSig.deploy(owners, requiredConfirmations);
   await multisig.waitForDeployment();
@@ -17,8 +17,8 @@ async function main() {
   // -----------------------------
   // 2) DEPLOY TOKEN
   // -----------------------------
-  const DAOToken = await hre.ethers.getContractFactory("DAOToken");
-  const token = await DAOToken.deploy(deployer.address);
+  const Token = await hre.ethers.getContractFactory("Token");
+  const token = await Token.deploy(deployer.address);
   await token.waitForDeployment();
   console.log("✔ Token deployed at:", token.target);
 
@@ -63,7 +63,7 @@ async function main() {
   console.log("✔ Staking deployed at:", staking.target);
 
   // -----------------------------
-  // 6) CONFIGURACIÓN DEL DAO QUE DEBE HACER EL MULTISIG
+  // 6) CONFIGURACIÓN DEL DAO
   // -----------------------------
   // 6a) Registrar Staking
   const dataSetStaking = dao.interface.encodeFunctionData(
@@ -71,7 +71,7 @@ async function main() {
     [staking.target]
   );
 
-  // 6b) Configurar Panic Wallet (ej: misma multisig)
+  // 6b) Configurar Panic Wallet
   const dataSetPanic = dao.interface.encodeFunctionData(
     "setPanicWallet",
     [multisig.target]

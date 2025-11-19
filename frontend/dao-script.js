@@ -1,7 +1,7 @@
 // ---- CONFIG ----
-const DAO_ADDRESS = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
-const DAO_ABI = [ 
-  {
+const DAO_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
+const DAO_ABI = [
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -68,6 +68,19 @@ const DAO_ABI = [
       ],
       "name": "OwnableUnauthorizedAccount",
       "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "delegation",
+          "type": "address"
+        }
+      ],
+      "name": "DelegationContractSet",
+      "type": "event"
     },
     {
       "anonymous": false,
@@ -186,7 +199,7 @@ const DAO_ABI = [
         },
         {
           "indexed": false,
-          "internalType": "enum DAO.ProposalStatus",
+          "internalType": "enum DAOCore.ProposalStatus",
           "name": "status",
           "type": "uint8"
         }
@@ -219,23 +232,11 @@ const DAO_ABI = [
         {
           "indexed": true,
           "internalType": "address",
-          "name": "buyer",
+          "name": "tokenContract",
           "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "weiPaid",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "tokensMinted",
-          "type": "uint256"
         }
       ],
-      "name": "TokensPurchased",
+      "name": "TokenContractSet",
       "type": "event"
     },
     {
@@ -280,20 +281,13 @@ const DAO_ABI = [
       "inputs": [
         {
           "indexed": false,
-          "internalType": "enum DAO.VotingMode",
+          "internalType": "enum DAOCore.VotingMode",
           "name": "mode",
           "type": "uint8"
         }
       ],
       "name": "VotingModeToggled",
       "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "buyTokens",
-      "outputs": [],
-      "stateMutability": "payable",
-      "type": "function"
     },
     {
       "inputs": [
@@ -332,6 +326,32 @@ const DAO_ABI = [
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "daoToken",
+      "outputs": [
+        {
+          "internalType": "contract IDAOToken",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "delegation",
+      "outputs": [
+        {
+          "internalType": "contract IDAODelegation",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -345,72 +365,59 @@ const DAO_ABI = [
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "getAllProposals",
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getProposal",
       "outputs": [
         {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "id",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "creator",
-              "type": "address"
-            },
-            {
-              "internalType": "string",
-              "name": "title",
-              "type": "string"
-            },
-            {
-              "internalType": "string",
-              "name": "description",
-              "type": "string"
-            },
-            {
-              "internalType": "uint256",
-              "name": "votesFor",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "votesAgainst",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "startTime",
-              "type": "uint256"
-            },
-            {
-              "internalType": "enum DAO.ProposalStatus",
-              "name": "status",
-              "type": "uint8"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "address",
-                  "name": "voter",
-                  "type": "address"
-                },
-                {
-                  "internalType": "bool",
-                  "name": "choice",
-                  "type": "bool"
-                }
-              ],
-              "internalType": "struct DAO.VoterInfo[]",
-              "name": "voters",
-              "type": "tuple[]"
-            }
-          ],
-          "internalType": "struct DAO.ProposalView[]",
-          "name": "",
-          "type": "tuple[]"
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "votesFor",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "votesAgainst",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "startTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum DAOCore.ProposalStatus",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address[]",
+          "name": "voters",
+          "type": "address[]"
         }
       ],
       "stateMutability": "view",
@@ -419,76 +426,65 @@ const DAO_ABI = [
     {
       "inputs": [
         {
-          "internalType": "enum DAO.ProposalStatus",
-          "name": "status_",
-          "type": "uint8"
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
         }
       ],
-      "name": "getProposalsByStatus",
+      "name": "getVoteChoice",
       "outputs": [
         {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "id",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "creator",
-              "type": "address"
-            },
-            {
-              "internalType": "string",
-              "name": "title",
-              "type": "string"
-            },
-            {
-              "internalType": "string",
-              "name": "description",
-              "type": "string"
-            },
-            {
-              "internalType": "uint256",
-              "name": "votesFor",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "votesAgainst",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "startTime",
-              "type": "uint256"
-            },
-            {
-              "internalType": "enum DAO.ProposalStatus",
-              "name": "status",
-              "type": "uint8"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "address",
-                  "name": "voter",
-                  "type": "address"
-                },
-                {
-                  "internalType": "bool",
-                  "name": "choice",
-                  "type": "bool"
-                }
-              ],
-              "internalType": "struct DAO.VoterInfo[]",
-              "name": "voters",
-              "type": "tuple[]"
-            }
-          ],
-          "internalType": "struct DAO.ProposalView[]",
+          "internalType": "bool",
           "name": "",
-          "type": "tuple[]"
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
+        }
+      ],
+      "name": "hasVoted",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "isActive",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -579,19 +575,6 @@ const DAO_ABI = [
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "mintTokens",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [],
       "name": "owner",
       "outputs": [
@@ -670,8 +653,49 @@ const DAO_ABI = [
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "inFavor",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "votingPower",
+          "type": "uint256"
+        }
+      ],
+      "name": "recordDelegatedVote",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_delegation",
+          "type": "address"
+        }
+      ],
+      "name": "setDelegationContract",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -698,6 +722,19 @@ const DAO_ABI = [
         }
       ],
       "name": "setStakingAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_tokenContract",
+          "type": "address"
+        }
+      ],
+      "name": "setTokenContract",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -873,7 +910,7 @@ const DAO_ABI = [
       "name": "votingMode",
       "outputs": [
         {
-          "internalType": "enum DAO.VotingMode",
+          "internalType": "enum DAOCore.VotingMode",
           "name": "",
           "type": "uint8"
         }
@@ -894,18 +931,281 @@ const DAO_ABI = [
       "stateMutability": "view",
       "type": "function"
     }
-];
+  ];
 
-// ---------------------- STATE ----------------------
+const SimpleMultiSigABI = [
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "owners_",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint8",
+          "name": "required_",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId",
+          "type": "uint256"
+        }
+      ],
+      "name": "AlreadyExecuted",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "ExecutionFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidRequiredConfirmations",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidTransaction",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAnOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotEnoughConfirmations",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OwnersRequired",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "txId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "TransactionConfirmed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "txId",
+          "type": "uint256"
+        }
+      ],
+      "name": "TransactionExecuted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "txId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "TransactionSubmitted",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "_requiredConfirmations",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId_",
+          "type": "uint256"
+        }
+      ],
+      "name": "confirmTransaction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId_",
+          "type": "uint256"
+        }
+      ],
+      "name": "confirmations",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "txnId_",
+          "type": "uint256"
+        }
+      ],
+      "name": "executeTransaction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owners",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to_",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "value_",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data_",
+          "type": "bytes"
+        }
+      ],
+      "name": "submitTransaction",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "transactionCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ];
+
 let provider, signer, daoContract, currentAccount;
 let contractTokenDecimals = 0;
 
-// ---------------------- DOM HELPERS ----------------------
 const q = id => document.getElementById(id);
 const fmtAddr = a => a ? `${a.slice(0,6)}...${a.slice(-4)}` : "-";
 const alertErr = e => {
   console.error(e);
-  alert("Error: " + (e?.message || e));
+
+  const reason =
+    e.reason ||                               
+    e.shortMessage ||                        
+    e.info?.error?.message ||                 
+    e.data?.message ||                        
+    e.message;                             
+
+  alert("Error: " + reason.replace("execution reverted: ", ""));
 };
 
 const setOwnerUIVisible = visible => {
@@ -923,7 +1223,6 @@ const setOwnerUIVisible = visible => {
   });
 };
 
-// ---------------------- SAFE PARSING ----------------------
 function parseTokenAmountToBigInt(amountStr, decimals) {
   const parts = amountStr.split(".");
   const whole = parts[0] || "0";
@@ -938,26 +1237,44 @@ function safeBigIntFromInput(v) {
   return BigInt(v);
 }
 
-// ---------------------- DAO INITIALIZATION ----------------------
 async function initDAO() {
   if (!daoContract) return;
 
   try {
-    let ownerAddr = null;
+    let multisigAddr = null;
     try {
-      ownerAddr = await daoContract.owner();
-    } catch(e) {
+      multisigAddr = await daoContract.owner();
+    } catch (e) {
       console.warn("No owner() available?", e);
     }
 
-    const isOwner = ownerAddr && currentAccount &&
-                    ownerAddr.toLowerCase() === currentAccount.toLowerCase();
+    let isOwner = false;
+
+    if (multisigAddr && currentAccount) {
+      try {
+        const multisig = new ethers.Contract(
+          multisigAddr,
+          SimpleMultiSigABI,
+          signer
+        );
+
+        const owners = await multisig.owners();
+        isOwner = owners.some(
+          o => o.toLowerCase() === currentAccount.toLowerCase()
+        );
+
+        console.log("Owners multisig:", owners);
+      } catch (err) {
+        console.warn("No se pudieron leer owners() del multisig", err);
+      }
+    }
 
     setOwnerUIVisible(isOwner);
-    if (isOwner) q("ownerMsg").textContent = `Eres el owner (${fmtAddr(ownerAddr)})`;
-    else q("ownerMsg").textContent = `No sos owner. Algunas acciones están deshabilitadas.`;
+    if (isOwner)
+      q("ownerMsg").textContent = `Eres owner del multisig (${fmtAddr(currentAccount)})`;
+    else
+      q("ownerMsg").textContent = `No sos owner. Algunas acciones están deshabilitadas.`;
 
-    // Panic state
     let panicMsg = "";
     try {
       const pw = await daoContract.panicWallet();
@@ -978,7 +1295,7 @@ async function initDAO() {
       }
     } catch {}
 
-    if(q("panicMsg")) q("panicMsg").textContent = panicMsg;
+    if (q("panicMsg")) q("panicMsg").textContent = panicMsg;
 
     await loadProposals();
     await updateVotingModeUI();
@@ -988,7 +1305,6 @@ async function initDAO() {
   }
 }
 
-// ---------------------- LOAD PROPOSALS ----------------------
 async function loadProposals() {
   try {
     const proposals = await daoContract.getAllProposals();
@@ -1029,7 +1345,6 @@ async function loadProposals() {
   }
 }
 
-// ---------------------- ACTIONS ----------------------
 async function vote(id, inFavor) {
   try {
     const amount = prompt("Tokens a stakear:");
@@ -1051,7 +1366,6 @@ async function finalizeProposal(id) {
   } catch (e) { alertErr(e); }
 }
 
-// ---------------------- VOTING MODE ----------------------
 async function updateVotingModeUI() {
   try {
     const mode = await daoContract.votingMode();
@@ -1063,12 +1377,12 @@ async function updateVotingModeUI() {
   } catch {}
 }
 
-// ---------------------- PAGE INITIALIZATION ----------------------
+
+
 window.addEventListener("DOMContentLoaded", () => {
 
   console.log("DOM listo. Inicializando listeners…");
 
-  // CONNECT WALLET
   q("connectWalletBtn")?.addEventListener("click", async () => {
     try {
       await window.ethereum.request({ method: "eth_requestAccounts" });
@@ -1082,7 +1396,6 @@ window.addEventListener("DOMContentLoaded", () => {
       q("connectWalletBtn").textContent = `Conectado: ${fmtAddr(currentAccount)}`;
       q("connectWalletBtn").classList.replace("btn-outline-primary","btn-success");
 
-      // token decimals
       try {
         const tokenAddr = await daoContract.token();
         if (tokenAddr !== ethers.ZeroAddress) {
@@ -1098,7 +1411,6 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch (e) { alertErr(e); }
   });
 
-  // CREATE PROPOSAL
   q("btnCreateProp")?.addEventListener("click", async () => {
     try {
       const title = q("propTitle").value.trim();
@@ -1115,7 +1427,6 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch (e) { alertErr(e); }
   });
 
-  // BUY TOKENS
   q("btnBuy")?.addEventListener("click", async () => {
     try {
       const eth = q("buyEth").value;
@@ -1127,7 +1438,6 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch (e) { alertErr(e); }
   });
 
-  // PANIC
   q("btnActivatePanic")?.addEventListener("click", async () => {
     try {
       const tx = await daoContract.panic();
@@ -1146,4 +1456,185 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch (e) { alertErr(e); }
   });
 
+  q("btnMint")?.addEventListener("click", async () => {
+    try {
+      const amount = q("mintAmount").value;
+      if (!amount) return alert("Ingrese amount");
+
+      const tx = await daoContract.mintTokens(amount);
+      await tx.wait();
+
+      alert("Tokens minteados");
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnCheckStakes")?.addEventListener("click", async () => {
+    try {
+      const addr = q("addrToCheck").value.trim();
+      if (!addr) return alert("Ingrese una dirección");
+
+      const balance = await daoContract.getUserTokenBalance(addr);
+      const staking = await daoContract.getUserStaking(addr);
+
+      let html = `
+        <h5>Balance: ${balance.toString()} tokens</h5>
+        <hr>
+        <h6>Staking por propuesta:</h6>
+      `;
+
+      for (let i = 0; i < staking.proposalIds.length; i++) {
+        html += `
+          <div class="border p-2 mb-2 rounded">
+            <b>Propuesta #${staking.proposalIds[i]}</b><br>
+            🟦 Stake de voto: ${staking.voteStakes[i]}<br>
+            🟥 Stake de propuesta: ${staking.proposalStakes[i]}
+          </div>
+        `;
+      }
+
+      q("stakesResult").innerHTML = html;
+
+    } catch (e) {
+      alertErr(e);
+    }
+  });
+
+  q("btnCheckStakes")?.addEventListener("click", async () => {
+    try {
+      const addr = q("addrToCheck").value.trim();
+      if (!addr) return alert("Ingrese una dirección");
+
+      const balance = await daoContract.getUserTokenBalance(addr);
+      const staking = await daoContract.getUserStaking(addr);
+
+      let html = `
+        <h5>Balance: ${balance.toString()} tokens</h5>
+        <hr>
+        <h6>Staking por propuesta:</h6>
+      `;
+
+      for (let i = 0; i < staking.proposalIds.length; i++) {
+        html += `
+          <div class="border p-2 mb-2 rounded">
+            <b>Propuesta #${staking.proposalIds[i]}</b><br>
+            🟦 Stake de voto: ${staking.voteStakes[i]}<br>
+            🟥 Stake de propuesta: ${staking.proposalStakes[i]}
+          </div>
+        `;
+      }
+
+      q("stakesResult").innerHTML = html;
+
+    } catch (e) {
+      alertErr(e);
+    }
+  });
+
+  q("btnUpdateParams")?.addEventListener("click", async () => {
+    try {
+      const price = q("paramPrice").value.trim();
+      const minVote = q("paramMinVote").value.trim();
+      const minProp = q("paramMinProp").value.trim();
+      const votingPeriod = q("paramVotingPeriod").value.trim();
+      const tokensPerVP = q("paramTokensPerVP").value.trim();
+      const lockTime = q("paramLockTime").value.trim();
+
+      if (!price || !minVote || !minProp || !votingPeriod || !tokensPerVP || !lockTime) {
+        return alert("Complete todos los campos de parámetros");
+      }
+
+      const tx = await daoContract.updateParams(
+        safeBigIntFromInput(price),
+        safeBigIntFromInput(minVote),
+        safeBigIntFromInput(minProp),
+        safeBigIntFromInput(votingPeriod),
+        safeBigIntFromInput(tokensPerVP),
+        safeBigIntFromInput(lockTime)
+      );
+      await tx.wait();
+      alert("Parámetros actualizados");
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnTransferOwner")?.addEventListener("click", async () => {
+    try {
+      const newOwner = q("newOwnerAddr").value.trim();
+      if (!newOwner) return alert("Ingrese una dirección");
+
+      const tx = await daoContract.transferOwnership(newOwner);
+      await tx.wait();
+      alert("Ownership transferido");
+      await initDAO();
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnSetPanicWallet")?.addEventListener("click", async () => {
+    try {
+      const wallet = q("panicWalletAddr").value.trim();
+      if (!wallet) return alert("Ingrese una dirección");
+
+      const tx = await daoContract.setPanicWallet(wallet);
+      await tx.wait();
+      alert("Panic wallet configurada");
+      await initDAO();
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnUnstake")?.addEventListener("click", async () => {
+    try {
+      const proposalId = q("unstakeProposalId").value.trim();
+      if (!proposalId) return alert("Ingrese un ID de propuesta");
+
+      const tx = await daoContract.unstakeProposal(safeBigIntFromInput(proposalId));
+      await tx.wait();
+      alert("Tokens desbloqueados de la propuesta");
+    } catch (e) { alertErr(e); }
+  });
+
+  q("filterStatus")?.addEventListener("change", async () => {
+    try {
+      const filter = q("filterStatus").value;
+      const list = q("proposalsList");
+      if (!list) return;
+
+      let proposals;
+      if (filter === "ALL") {
+        proposals = await daoContract.getAllProposals();
+      } else {
+        const statusMap = { "ACTIVE": 0, "ACCEPTED": 1, "REJECTED": 2 };
+        proposals = await daoContract.getProposalsByStatus(statusMap[filter]);
+      }
+
+      list.innerHTML = "";
+      proposals.forEach((p, idx) => {
+        const id = p.id ?? idx + 1;
+        const title = p.title ?? "Sin título";
+        const description = p.description ?? "";
+        const votesFor = p.votesFor?.toString() ?? "0";
+        const votesAgainst = p.votesAgainst?.toString() ?? "0";
+        const status = Number(p.status);
+        const statusLabel = ["Activa", "Aprobada", "Rechazada"][status] || status;
+
+        const el = document.createElement("div");
+        el.className = "border p-2 rounded mb-2";
+        el.innerHTML = `
+          <div class="d-flex justify-content-between">
+            <div><b>#${id}</b> - ${title}</div>
+            <small>Estado: ${statusLabel}</small>
+          </div>
+          <div class="mt-1"><small>${description}</small></div>
+          <div class="mt-2">🟩 ${votesFor} / 🟥 ${votesAgainst}</div>
+          <div class="mt-2">
+            <button class="btn btn-sm btn-success me-1" onclick="vote(${id}, true)">Votar a favor</button>
+            <button class="btn btn-sm btn-danger me-1" onclick="vote(${id}, false)">Votar en contra</button>
+            <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">Finalizar</button>
+          </div>
+        `;
+        list.appendChild(el);
+      });
+
+    } catch (e) {
+      console.error("Error filtering proposals", e);
+    }
+  });
 });

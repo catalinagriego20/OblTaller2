@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT 
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -9,6 +9,9 @@ interface IMintableERC20 {
     function decimals() external view returns (uint8);
     function balanceOf(address account) external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
 }
 
 interface IStaking {
@@ -16,29 +19,29 @@ interface IStaking {
     function stakeProposal(address user, uint256 amount, uint256 proposalId) external;
     function unstakeVote(address user, uint256 proposalId) external;
     function unstakeProposal(address user, uint256 proposalId) external;
-
     function voteStakeOf(address user, uint256 proposalId) external view returns (uint256);
     function proposalStakeOf(address user, uint256 proposalId) external view returns (uint256);
 }
 
-contract DAO is Ownable {
+interface IMultiSig {
+    function owners() external view returns (address[] memory);
+}
+
+interface IDAODelegation {
+    function delegateVote(uint256 proposalId, address delegate, uint256 amount) external;
+    function revokeDelegation(uint256 proposalId) external;
+    function voteWithDelegation(uint256 proposalId, address delegator, bool inFavor) external returns (uint256);
+    function hasDelegated(uint256 proposalId, address delegator) external view returns (bool);
+    function getDelegationInfo(uint256 proposalId, address delegator) external view returns (address, uint256, bool);
+}
+
+interface IDAOToken {
+    function buyTokens() external payable;
+    function mintTokens(uint256 amount) external;
+}
+
+contract DAOCore is Ownable {
     enum VotingMode { LINEAR, QUADRATIC }
-
-    IMintableERC20 public token;
-    uint8 public tokenDecimals;
-    IStaking public staking;
-
-    address public panicWallet;
-    bool public isPanicked;
-
-    uint256 public priceWeiPerToken;
-    uint256 public minStakeForVote;
-    uint256 public minStakeForProposal;
-    uint256 public votingPeriod;
-    uint256 public tokensPerVotingPower;
-    uint256 public lockTimeSeconds;
-    VotingMode public votingMode = VotingMode.LINEAR;
-
     enum ProposalStatus { ACTIVE, ACCEPTED, REJECTED }
 
     struct Proposal {
@@ -55,26 +58,37 @@ contract DAO is Ownable {
         address[] voters;
     }
 
+    IMintableERC20 public token;
+    uint8 public tokenDecimals;
+    IStaking public staking;
+    IDAODelegation public delegation;
+    IDAOToken public daoToken;
+
+    address public panicWallet;
+    bool public isPanicked;
+
+    uint256 public priceWeiPerToken;
+    uint256 public minStakeForVote;
+    uint256 public minStakeForProposal;
+    uint256 public votingPeriod;
+    uint256 public tokensPerVotingPower;
+    uint256 public lockTimeSeconds;
+    VotingMode public votingMode = VotingMode.LINEAR;
+
     uint256 public proposalCount;
     mapping(uint256 => Proposal) private _proposals;
 
     event PanicSet(address indexed wallet);
     event PanicTriggered();
     event TranquilityRestored();
-    event ParamsUpdated(
-        uint256 priceWeiPerToken,
-        uint256 minStakeVote,
-        uint256 minStakeProposal,
-        uint256 votingPeriod,
-        uint256 tokensPerVP,
-        uint256 lockTimeSeconds
-    );
+    event ParamsUpdated(uint256 priceWeiPerToken, uint256 minStakeVote, uint256 minStakeProposal, uint256 votingPeriod, uint256 tokensPerVP, uint256 lockTimeSeconds);
     event VotingModeToggled(VotingMode mode);
     event StakingChanged(address indexed oldStaking, address indexed newStaking);
-    event TokensPurchased(address indexed buyer, uint256 weiPaid, uint256 tokensMinted);
     event ProposalCreated(uint256 indexed id, address indexed creator, string title);
     event Voted(uint256 indexed id, address indexed voter, bool inFavor, uint256 power);
     event ProposalFinalized(uint256 indexed id, ProposalStatus status);
+    event DelegationContractSet(address indexed delegation);
+    event TokenContractSet(address indexed tokenContract);
 
     modifier notPanicked() {
         require(!isPanicked, "Panic mode active");
@@ -88,6 +102,25 @@ contract DAO is Ownable {
 
     modifier onlyStakingSet() {
         require(address(staking) != address(0), "Invalid staking");
+        _;
+    }
+
+    modifier onlyMultisigOwner() {
+        address ownerAddr = owner();
+        if (msg.sender != ownerAddr) {
+            try IMultiSig(ownerAddr).owners() returns (address[] memory owners) {
+                bool isOwner = false;
+                for (uint256 i = 0; i < owners.length; i++) {
+                    if (owners[i] == msg.sender) {
+                        isOwner = true;
+                        break;
+                    }
+                }
+                require(isOwner, "Not a multisig owner");
+            } catch {
+                revert("Owner is not a multisig contract");
+            }
+        }
         _;
     }
 
@@ -119,9 +152,24 @@ contract DAO is Ownable {
         lockTimeSeconds = _lockTimeSeconds;
     }
 
-    // --- OWNER ACTIONS ---
-    function mintTokens(uint256 amount) external onlyOwner panicConfigured notPanicked {
-        token.mint(address(this), amount);
+    // --- CONFIGURACIÓN ---
+    function setDelegationContract(address _delegation) external onlyMultisigOwner {
+        require(_delegation != address(0), "Invalid delegation");
+        delegation = IDAODelegation(_delegation);
+        emit DelegationContractSet(_delegation);
+    }
+
+    function setTokenContract(address _tokenContract) external onlyMultisigOwner {
+        require(_tokenContract != address(0), "Invalid token contract");
+        daoToken = IDAOToken(_tokenContract);
+        emit TokenContractSet(_tokenContract);
+    }
+
+    function setStakingAddress(address _staking) external onlyMultisigOwner {
+        require(_staking != address(0), "Invalid staking");
+        address old = address(staking);
+        staking = IStaking(_staking);
+        emit StakingChanged(old, _staking);
     }
 
     function updateParams(
@@ -131,7 +179,7 @@ contract DAO is Ownable {
         uint256 _votingPeriodSeconds,
         uint256 _tokensPerVotingPower,
         uint256 _lockTimeSeconds
-    ) external onlyOwner panicConfigured notPanicked {
+    ) external onlyMultisigOwner panicConfigured notPanicked {
         require(_priceWeiPerToken > 0, "Invalid price");
         require(_tokensPerVotingPower > 0, "Invalid tokensPerVP");
         require(_votingPeriodSeconds > 0, "Invalid voting period");
@@ -143,26 +191,23 @@ contract DAO is Ownable {
         tokensPerVotingPower = _tokensPerVotingPower;
         lockTimeSeconds = _lockTimeSeconds;
 
-        emit ParamsUpdated(
-            _priceWeiPerToken,
-            _minStakeVote,
-            _minStakeProposal,
-            _votingPeriodSeconds,
-            _tokensPerVotingPower,
-            _lockTimeSeconds
-        );
+        emit ParamsUpdated(_priceWeiPerToken, _minStakeVote, _minStakeProposal, _votingPeriodSeconds, _tokensPerVotingPower, _lockTimeSeconds);
     }
 
-    function changeOwner(address newOwner) external onlyOwner {
+    function changeOwner(address newOwner) external onlyMultisigOwner {
         require(newOwner != address(0), "Invalid new owner");
         transferOwnership(newOwner);
     }
 
-    // panic wallet is set by the owner (multisig) via frontend actions (multisig tx)
-    function setPanicWallet(address _wallet) external onlyOwner {
+    function setPanicWallet(address _wallet) external onlyMultisigOwner {
         require(_wallet != address(0), "Invalid wallet");
         panicWallet = _wallet;
         emit PanicSet(_wallet);
+    }
+
+    function toggleVotingMode() external onlyMultisigOwner panicConfigured {
+        votingMode = (votingMode == VotingMode.LINEAR) ? VotingMode.QUADRATIC : VotingMode.LINEAR;
+        emit VotingModeToggled(votingMode);
     }
 
     function panic() external panicConfigured {
@@ -177,35 +222,7 @@ contract DAO is Ownable {
         emit TranquilityRestored();
     }
 
-    function buyTokens() external payable notPanicked panicConfigured {
-        _buyTokens(msg.sender, msg.value);
-    }
-
-    function _buyTokens(address buyer, uint256 weiAmount) internal {
-        require(weiAmount > 0, "No ETH sent");
-        require(priceWeiPerToken > 0, "Price not set");
-
-        uint8 dec = tokenDecimals;
-        uint256 tokensOut = (weiAmount * (10 ** uint256(dec))) / priceWeiPerToken;
-        require(tokensOut > 0, "Too little ETH");
-
-        uint256 daoBalance = token.balanceOf(address(this));
-        require(daoBalance >= tokensOut, "Not enough tokens in DAO");
-
-        emit TokensPurchased(buyer, weiAmount, tokensOut);
-
-        token.transfer(buyer, tokensOut);
-    }
-
-    // --- STAKING LINK ---
-    function setStakingAddress(address _staking) external {
-        require(_staking != address(0), "Invalid staking");
-        address old = address(staking);
-        staking = IStaking(_staking);
-        emit StakingChanged(old, _staking);
-    }
-
-    // --- PROPOSALS & VOTING ---
+    // --- PROPUESTAS ---
     function createProposal(string memory title, string memory description, uint256 stakingAmount)
         external
         notPanicked
@@ -225,15 +242,7 @@ contract DAO is Ownable {
 
         emit ProposalCreated(id, msg.sender, title);
 
-        // stake in external staking contract (only callable by DAO)
         staking.stakeProposal(msg.sender, stakingAmount, id);
-    }
-
-    function _isActive(uint256 id) internal view returns (bool) {
-        Proposal storage p = _proposals[id];
-        if (p.status != ProposalStatus.ACTIVE) return false;
-        if (block.timestamp > p.startTime + votingPeriod) return false;
-        return true;
     }
 
     function vote(uint256 id, bool inFavor, uint256 stakingAmount)
@@ -242,20 +251,17 @@ contract DAO is Ownable {
         panicConfigured
         onlyStakingSet
     {
-        // FIX: usar minStakeForVote (antes usaba minStakeForProposal)
         require(stakingAmount >= minStakeForVote, "Insufficient voting stake");
 
         Proposal storage p = _proposals[id];
         require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
         require(_isActive(id), "Not active");
-
-        uint256 vp;
-        if (votingMode == VotingMode.QUADRATIC) {
-            uint256 base = stakingAmount / tokensPerVotingPower;
-            vp = Math.sqrt(base);
-        } else {
-            vp = stakingAmount / tokensPerVotingPower;
+        
+        if (address(delegation) != address(0)) {
+            require(!delegation.hasDelegated(id, msg.sender), "Already delegated vote for this proposal");
         }
+
+        uint256 vp = _calculateVotingPower(stakingAmount);
         require(vp > 0, "Zero voting power");
 
         p.voted[msg.sender] = true;
@@ -270,6 +276,24 @@ contract DAO is Ownable {
         staking.stakeVote(msg.sender, stakingAmount, id);
     }
 
+    function recordDelegatedVote(uint256 id, address voter, bool inFavor, uint256 votingPower) external {
+        require(msg.sender == address(delegation), "Only delegation contract");
+        
+        Proposal storage p = _proposals[id];
+        require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
+        require(_isActive(id), "Not active");
+        require(!p.voted[voter], "Already voted");
+
+        p.voted[voter] = true;
+        p.voteChoice[voter] = inFavor;
+        p.voters.push(voter);
+
+        if (inFavor) p.votesFor += votingPower;
+        else p.votesAgainst += votingPower;
+
+        emit Voted(id, voter, inFavor, votingPower);
+    }
+
     function unstakeVote(uint256 proposalId) external notPanicked onlyStakingSet panicConfigured {
         Proposal storage p = _proposals[proposalId];
         require(p.voted[msg.sender], "User did not vote");
@@ -277,13 +301,7 @@ contract DAO is Ownable {
         uint256 stakeAmount = staking.voteStakeOf(msg.sender, proposalId);
         require(stakeAmount > 0, "No stake to unstake");
 
-        uint256 vp;
-        if (votingMode == VotingMode.QUADRATIC) {
-            uint256 base = stakeAmount / tokensPerVotingPower;
-            vp = Math.sqrt(base);
-        } else {
-            vp = stakeAmount / tokensPerVotingPower;
-        }
+        uint256 vp = _calculateVotingPower(stakeAmount);
 
         if (p.voteChoice[msg.sender]) {
             if (p.votesFor >= vp) p.votesFor -= vp;
@@ -296,15 +314,7 @@ contract DAO is Ownable {
         p.voted[msg.sender] = false;
         delete p.voteChoice[msg.sender];
 
-        // remove voter
-        uint256 n = p.voters.length;
-        for (uint256 i = 0; i < n; i++) {
-            if (p.voters[i] == msg.sender) {
-                p.voters[i] = p.voters[n - 1];
-                p.voters.pop();
-                break;
-            }
-        }
+        _removeVoter(p, msg.sender);
 
         staking.unstakeVote(msg.sender, proposalId);
     }
@@ -327,104 +337,71 @@ contract DAO is Ownable {
         emit ProposalFinalized(id, p.status);
     }
 
-    function toggleVotingMode() external onlyOwner panicConfigured {
-        votingMode = (votingMode == VotingMode.LINEAR) ? VotingMode.QUADRATIC : VotingMode.LINEAR;
-        emit VotingModeToggled(votingMode);
+    // --- FUNCIONES INTERNAS ---
+    function _isActive(uint256 id) internal view returns (bool) {
+        Proposal storage p = _proposals[id];
+        if (p.status != ProposalStatus.ACTIVE) return false;
+        if (block.timestamp > p.startTime + votingPeriod) return false;
+        return true;
     }
 
-    // ----- Vistas para frontend -----
-    struct VoterInfo {
-        address voter;
-        bool choice;
-    }
-
-    struct ProposalView {
-        uint256 id;
-        address creator;
-        string title;
-        string description;
-        uint256 votesFor;
-        uint256 votesAgainst;
-        uint256 startTime;
-        ProposalStatus status;
-        VoterInfo[] voters;
-    }
-
-    function getAllProposals() external view returns (ProposalView[] memory) {
-        ProposalView[] memory result = new ProposalView[](proposalCount);
-        for (uint256 i = 1; i <= proposalCount; i++) {
-            Proposal storage p = _proposals[i];
-            uint256 votersCount = p.voters.length;
-            VoterInfo[] memory votersInfo = new VoterInfo[](votersCount);
-            for (uint256 j = 0; j < votersCount; j++) {
-                address v = p.voters[j];
-                votersInfo[j] = VoterInfo({voter: v, choice: p.voteChoice[v]});
-            }
-
-            result[i - 1] = ProposalView({
-                id: p.id,
-                creator: p.creator,
-                title: p.title,
-                description: p.description,
-                votesFor: p.votesFor,
-                votesAgainst: p.votesAgainst,
-                startTime: p.startTime,
-                status: p.status,
-                voters: votersInfo
-            });
+    function _calculateVotingPower(uint256 stakingAmount) internal view returns (uint256) {
+        if (votingMode == VotingMode.QUADRATIC) {
+            uint256 base = stakingAmount / tokensPerVotingPower;
+            return Math.sqrt(base);
+        } else {
+            return stakingAmount / tokensPerVotingPower;
         }
-        return result;
     }
 
-    function getProposalsByStatus(ProposalStatus status_) external view returns (ProposalView[] memory) {
-        uint256 count = 0;
-        for (uint256 i = 1; i <= proposalCount; i++) {
-            if (_proposals[i].status == status_) count++;
-        }
-
-        ProposalView[] memory result = new ProposalView[](count);
-        uint256 idx = 0;
-        for (uint256 i = 1; i <= proposalCount; i++) {
-            Proposal storage p = _proposals[i];
-            if (p.status == status_) {
-                uint256 votersCount = p.voters.length;
-                VoterInfo[] memory votersInfo = new VoterInfo[](votersCount);
-                for (uint256 j = 0; j < votersCount; j++) {
-                    address v = p.voters[j];
-                    votersInfo[j] = VoterInfo({voter: v, choice: p.voteChoice[v]});
-                }
-
-                result[idx] = ProposalView({
-                    id: p.id,
-                    creator: p.creator,
-                    title: p.title,
-                    description: p.description,
-                    votesFor: p.votesFor,
-                    votesAgainst: p.votesAgainst,
-                    startTime: p.startTime,
-                    status: p.status,
-                    voters: votersInfo
-                });
-                idx++;
+    function _removeVoter(Proposal storage p, address voter) internal {
+        uint256 n = p.voters.length;
+        for (uint256 i = 0; i < n; i++) {
+            if (p.voters[i] == voter) {
+                p.voters[i] = p.voters[n - 1];
+                p.voters.pop();
+                break;
             }
         }
-        return result;
     }
 
-    // ----- FUNCIONES QUE USA STAKING (IDAO) -----
-    // devuelve tiempo de lock en segundos
-    function lockTime() external view returns (uint256) {
-        return lockTimeSeconds;
+    // --- VISTAS PÚBLICAS ---
+    function getProposal(uint256 id) external view returns (
+        uint256 proposalId,
+        address creator,
+        string memory title,
+        string memory description,
+        uint256 votesFor,
+        uint256 votesAgainst,
+        uint256 startTime,
+        ProposalStatus status,
+        address[] memory voters
+    ) {
+        Proposal storage p = _proposals[id];
+        return (p.id, p.creator, p.title, p.description, p.votesFor, p.votesAgainst, p.startTime, p.status, p.voters);
     }
 
-    // valida que la propuesta exista (puedes extender la lógica si hace falta)
+    function hasVoted(uint256 proposalId, address voter) external view returns (bool) {
+        return _proposals[proposalId].voted[voter];
+    }
+
+    function getVoteChoice(uint256 proposalId, address voter) external view returns (bool) {
+        return _proposals[proposalId].voteChoice[voter];
+    }
+
     function isValidProposal(uint256 proposalId) external view returns (bool) {
         return (proposalId > 0 && proposalId <= proposalCount);
     }
 
-    // retorna el creador de la propuesta
     function proposalCreator(uint256 proposalId) external view returns (address) {
-        Proposal storage p = _proposals[proposalId];
-        return p.creator;
+        return _proposals[proposalId].creator;
+    }
+
+    function lockTime() external view returns (uint256) {
+        return lockTimeSeconds;
+    }
+
+    function isActive(uint256 id) external view returns (bool) {
+        return _isActive(id);
     }
 }
