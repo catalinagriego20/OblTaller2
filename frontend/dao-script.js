@@ -1,1196 +1,22 @@
 // ---- CONFIG ----
-const DAO_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
-const DAO_ABI = [
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_multisigOwner",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_priceWeiPerToken",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minStakeVote",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minStakeProposal",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_votingPeriodSeconds",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_tokensPerVotingPower",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_lockTimeSeconds",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "OwnableInvalidOwner",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "OwnableUnauthorizedAccount",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "delegation",
-          "type": "address"
-        }
-      ],
-      "name": "DelegationContractSet",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "previousOwner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "OwnershipTransferred",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "wallet",
-          "type": "address"
-        }
-      ],
-      "name": "PanicSet",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [],
-      "name": "PanicTriggered",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "priceWeiPerToken",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "minStakeVote",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "minStakeProposal",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "votingPeriod",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "tokensPerVP",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "lockTimeSeconds",
-          "type": "uint256"
-        }
-      ],
-      "name": "ParamsUpdated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "creator",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "title",
-          "type": "string"
-        }
-      ],
-      "name": "ProposalCreated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "enum DAOCore.ProposalStatus",
-          "name": "status",
-          "type": "uint8"
-        }
-      ],
-      "name": "ProposalFinalized",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "oldStaking",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "newStaking",
-          "type": "address"
-        }
-      ],
-      "name": "StakingChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "tokenContract",
-          "type": "address"
-        }
-      ],
-      "name": "TokenContractSet",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [],
-      "name": "TranquilityRestored",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "voter",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "bool",
-          "name": "inFavor",
-          "type": "bool"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "power",
-          "type": "uint256"
-        }
-      ],
-      "name": "Voted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "enum DAOCore.VotingMode",
-          "name": "mode",
-          "type": "uint8"
-        }
-      ],
-      "name": "VotingModeToggled",
-      "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "changeOwner",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "string",
-          "name": "title",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "stakingAmount",
-          "type": "uint256"
-        }
-      ],
-      "name": "createProposal",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "daoToken",
-      "outputs": [
-        {
-          "internalType": "contract IDAOToken",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "delegation",
-      "outputs": [
-        {
-          "internalType": "contract IDAODelegation",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        }
-      ],
-      "name": "finalize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        }
-      ],
-      "name": "getProposal",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "creator",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "title",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "votesFor",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "votesAgainst",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "enum DAOCore.ProposalStatus",
-          "name": "status",
-          "type": "uint8"
-        },
-        {
-          "internalType": "address[]",
-          "name": "voters",
-          "type": "address[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "voter",
-          "type": "address"
-        }
-      ],
-      "name": "getVoteChoice",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "voter",
-          "type": "address"
-        }
-      ],
-      "name": "hasVoted",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        }
-      ],
-      "name": "isActive",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "isPanicked",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        }
-      ],
-      "name": "isValidProposal",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "lockTime",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "lockTimeSeconds",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "minStakeForProposal",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "minStakeForVote",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "owner",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "panic",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "panicWallet",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "priceWeiPerToken",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "proposalCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        }
-      ],
-      "name": "proposalCreator",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "voter",
-          "type": "address"
-        },
-        {
-          "internalType": "bool",
-          "name": "inFavor",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "votingPower",
-          "type": "uint256"
-        }
-      ],
-      "name": "recordDelegatedVote",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "renounceOwnership",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_delegation",
-          "type": "address"
-        }
-      ],
-      "name": "setDelegationContract",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_wallet",
-          "type": "address"
-        }
-      ],
-      "name": "setPanicWallet",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_staking",
-          "type": "address"
-        }
-      ],
-      "name": "setStakingAddress",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_tokenContract",
-          "type": "address"
-        }
-      ],
-      "name": "setTokenContract",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "staking",
-      "outputs": [
-        {
-          "internalType": "contract IStaking",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "toggleVotingMode",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "token",
-      "outputs": [
-        {
-          "internalType": "contract IMintableERC20",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "tokenDecimals",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "tokensPerVotingPower",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "tranquility",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "transferOwnership",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        }
-      ],
-      "name": "unstakeProposal",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        }
-      ],
-      "name": "unstakeVote",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_priceWeiPerToken",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minStakeVote",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minStakeProposal",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_votingPeriodSeconds",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_tokensPerVotingPower",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_lockTimeSeconds",
-          "type": "uint256"
-        }
-      ],
-      "name": "updateParams",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bool",
-          "name": "inFavor",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "stakingAmount",
-          "type": "uint256"
-        }
-      ],
-      "name": "vote",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "votingMode",
-      "outputs": [
-        {
-          "internalType": "enum DAOCore.VotingMode",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "votingPeriod",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
-  ];
+const CONTRACTS = {
+  daoCore: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  daoDelegation: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  daoToken: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  daoViews: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+  staking: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+  token: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+};
 
-const SimpleMultiSigABI = [
-    {
-      "inputs": [
-        {
-          "internalType": "address[]",
-          "name": "owners_",
-          "type": "address[]"
-        },
-        {
-          "internalType": "uint8",
-          "name": "required_",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId",
-          "type": "uint256"
-        }
-      ],
-      "name": "AlreadyExecuted",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        }
-      ],
-      "name": "ExecutionFailed",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidRequiredConfirmations",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId",
-          "type": "uint256"
-        }
-      ],
-      "name": "InvalidTransaction",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NotAnOwner",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NotEnoughConfirmations",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "OwnersRequired",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "txId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "TransactionConfirmed",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "txId",
-          "type": "uint256"
-        }
-      ],
-      "name": "TransactionExecuted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "txId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        }
-      ],
-      "name": "TransactionSubmitted",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "_requiredConfirmations",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId_",
-          "type": "uint256"
-        }
-      ],
-      "name": "confirmTransaction",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId_",
-          "type": "uint256"
-        }
-      ],
-      "name": "confirmations",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "txnId_",
-          "type": "uint256"
-        }
-      ],
-      "name": "executeTransaction",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "owners",
-      "outputs": [
-        {
-          "internalType": "address[]",
-          "name": "",
-          "type": "address[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to_",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "value_",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "data_",
-          "type": "bytes"
-        }
-      ],
-      "name": "submitTransaction",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "transactionCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "stateMutability": "payable",
-      "type": "receive"
-    }
-  ];
+import DAOCoreABI from './abis/DAOCore.json';
+import DAODelegationABI from './abis/DAODelegation.json';
+import DAOTokenABI from './abis/DAOToken.json';
+import DAOViewsABI from './abis/DAOViews.json';
+import SimpleMultiSigABI from './abis/SimpleMultiSig.json';
 
-let provider, signer, daoContract, currentAccount;
+let provider, signer;
+let daoCoreContract, daoDelegationContract, daoTokenContract, daoViewsContract;
+let currentAccount;
 let contractTokenDecimals = 0;
 
 const q = id => document.getElementById(id);
@@ -1238,12 +64,12 @@ function safeBigIntFromInput(v) {
 }
 
 async function initDAO() {
-  if (!daoContract) return;
+  if (!daoCoreContract || !daoViewsContract) return;
 
   try {
     let multisigAddr = null;
     try {
-      multisigAddr = await daoContract.owner();
+      multisigAddr = await daoCoreContract.owner();
     } catch (e) {
       console.warn("No owner() available?", e);
     }
@@ -1277,14 +103,14 @@ async function initDAO() {
 
     let panicMsg = "";
     try {
-      const pw = await daoContract.panicWallet();
+      const pw = await daoCoreContract.panicWallet();
       panicMsg += pw && pw !== ethers.ZeroAddress
         ? `Panic wallet: ${fmtAddr(pw)} `
         : `Panic wallet no configurada `;
     } catch {}
 
     try {
-      const pan = await daoContract.isPanicked();
+      const pan = await daoCoreContract.isPanicked();
       if (pan) {
         panicMsg += " - DAO en modo PÁNICO";
         document.querySelectorAll("button").forEach(b => b.disabled = true);
@@ -1307,13 +133,13 @@ async function initDAO() {
 
 async function loadProposals() {
   try {
-    const proposals = await daoContract.getAllProposals();
+    const proposals = await daoViewsContract.getAllProposals();
 
     const list = q("proposalsList");
     if (!list) return;
     list.innerHTML = "";
 
-    proposals.forEach((p, idx) => {
+    for (const [idx, p] of proposals.entries()) {
       const id = p.id ?? idx + 1;
       const title = p.title ?? "Sin título";
       const description = p.description ?? "";
@@ -1322,23 +148,54 @@ async function loadProposals() {
       const status = Number(p.status);
       const statusLabel = ["Activa", "Aprobada", "Rechazada"][status] || status;
 
+      let delegationBadge = "";
+      if (currentAccount && daoViewsContract) {
+        try {
+          const [delegate, amount, active] = await daoViewsContract.getDelegationInfo(
+            id,
+            currentAccount
+          );
+          if (active && delegate !== ethers.ZeroAddress) {
+            delegationBadge = `<span class="delegation-badge">🤝 Delegado a ${fmtAddr(delegate)}</span>`;
+          }
+        } catch (e) {
+          console.log("No se pudo verificar delegación:", e);
+        }
+      }
+
       const el = document.createElement("div");
-      el.className = "border p-2 rounded mb-2";
+      el.className = "border p-3 rounded mb-3";
       el.innerHTML = `
-        <div class="d-flex justify-content-between">
-          <div><b>#${id}</b> - ${title}</div>
-          <small>Estado: ${statusLabel}</small>
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-1"><b>#${id}</b> - ${title} ${delegationBadge}</h5>
+            <small class="text-muted">${description}</small>
+          </div>
+          <span class="badge bg-${status === 0 ? 'primary' : status === 1 ? 'success' : 'danger'}">
+            ${statusLabel}
+          </span>
         </div>
-        <div class="mt-1"><small>${description}</small></div>
-        <div class="mt-2">🟩 ${votesFor} / 🟥 ${votesAgainst}</div>
-        <div class="mt-2">
-          <button class="btn btn-sm btn-success me-1" onclick="vote(${id}, true)">Votar a favor</button>
-          <button class="btn btn-sm btn-danger me-1" onclick="vote(${id}, false)">Votar en contra</button>
-          <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">Finalizar</button>
+        <div class="mt-3">
+          <span class="me-3">🟩 A favor: <strong>${votesFor}</strong></span>
+          <span>🟥 En contra: <strong>${votesAgainst}</strong></span>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+          <button class="btn btn-sm btn-success" onclick="vote(${id}, true)">
+            ✅ Votar a favor
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="vote(${id}, false)">
+            ❌ Votar en contra
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">
+            🏁 Finalizar
+          </button>
+          <button class="btn btn-sm btn-info" onclick="showDelegateModal(${id})">
+            🤝 Delegar
+          </button>
         </div>
       `;
       list.appendChild(el);
-    });
+    }
 
   } catch (e) {
     console.error("loadProposals error", e);
@@ -1350,7 +207,8 @@ async function vote(id, inFavor) {
     const amount = prompt("Tokens a stakear:");
     if (!amount) return;
     const stake = safeBigIntFromInput(amount);
-    const tx = await daoContract.vote(id, inFavor, stake);
+    
+    const tx = await daoCoreContract.vote(id, inFavor, stake);
     await tx.wait();
     alert("Voto registrado");
     await loadProposals();
@@ -1359,16 +217,76 @@ async function vote(id, inFavor) {
 
 async function finalizeProposal(id) {
   try {
-    const tx = await daoContract.finalize(id);
+    const tx = await daoCoreContract.finalize(id);
     await tx.wait();
     alert("Propuesta finalizada");
     await loadProposals();
   } catch (e) { alertErr(e); }
 }
 
+function showDelegateModal(proposalId) {
+  const delegateAddr = prompt("Dirección del delegado:");
+  if (!delegateAddr) return;
+  
+  const amount = prompt("Cantidad de tokens a delegar:");
+  if (!amount) return;
+  
+  q("delegateProposalId").value = proposalId;
+  q("delegateAddress").value = delegateAddr;
+  q("delegateAmount").value = amount;
+
+  const delegationTab = document.querySelector('#delegation-tab');
+  if (delegationTab) {
+    const tab = new bootstrap.Tab(delegationTab);
+    tab.show();
+    
+    setTimeout(() => {
+      q("btnDelegateVote")?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+}
+
+async function delegateVoteQuick(proposalId, delegateAddress, amount) {
+  try {
+    const stake = safeBigIntFromInput(amount);
+    const tx = await daoDelegationContract.delegateVote(
+      proposalId,
+      delegateAddress,
+      stake
+    );
+    await tx.wait();
+    alert("✅ Voto delegado exitosamente");
+    await loadProposals();
+  } catch (e) { 
+    alertErr(e); 
+  }
+}
+
+async function voteWithDelegation(proposalId) {
+  const delegatorAddr = prompt("Dirección del delegador:");
+  if (!delegatorAddr) return;
+  
+  const inFavor = confirm("¿Votar a favor? (Cancelar = En contra)");
+  
+  try {
+    const tx = await daoDelegationContract.voteWithDelegation(proposalId, delegatorAddr, inFavor);
+    await tx.wait();
+    alert("Voto con delegación registrado");
+    await loadProposals();
+  } catch (e) { alertErr(e); }
+}
+
+async function revokeDelegation(proposalId) {
+  try {
+    const tx = await daoDelegationContract.revokeDelegation(proposalId);
+    await tx.wait();
+    alert("Delegación revocada");
+  } catch (e) { alertErr(e); }
+}
+
 async function updateVotingModeUI() {
   try {
-    const mode = await daoContract.votingMode();
+    const mode = await daoCoreContract.votingMode();
     const text = Number(mode) === 0 ? "Lineal" : "Cuadrático";
     q("votingModeStatus").innerHTML = `<b>Modo actual:</b> ${text}`;
     q("btnToggleVotingMode").textContent = Number(mode) === 0
@@ -1376,8 +294,6 @@ async function updateVotingModeUI() {
       : "Cambiar a Lineal";
   } catch {}
 }
-
-
 
 window.addEventListener("DOMContentLoaded", () => {
 
@@ -1391,13 +307,17 @@ window.addEventListener("DOMContentLoaded", () => {
       signer = await provider.getSigner();
       currentAccount = await signer.getAddress();
 
-      daoContract = new ethers.Contract(DAO_ADDRESS, DAO_ABI, signer);
+      daoCoreContract = new ethers.Contract(CONTRACTS.daoCore, DAOCoreABI, signer);
+      daoDelegationContract = new ethers.Contract(CONTRACTS.daoDelegation, DAODelegationABI, signer);
+      daoTokenContract = new ethers.Contract(CONTRACTS.daoToken, DAOTokenABI, signer);
+      
+      daoViewsContract = new ethers.Contract(CONTRACTS.daoViews, DAOViewsABI, provider);
 
       q("connectWalletBtn").textContent = `Conectado: ${fmtAddr(currentAccount)}`;
       q("connectWalletBtn").classList.replace("btn-outline-primary","btn-success");
 
       try {
-        const tokenAddr = await daoContract.token();
+        const tokenAddr = await daoCoreContract.token();
         if (tokenAddr !== ethers.ZeroAddress) {
           const ercAbi = [
             "function decimals() view returns (uint8)"
@@ -1420,7 +340,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!title || !stakeStr) return alert("Título y stake requeridos.");
 
       const stake = safeBigIntFromInput(stakeStr);
-      const tx = await daoContract.createProposal(title, desc, stake);
+      const tx = await daoCoreContract.createProposal(title, desc, stake);
       await tx.wait();
       alert("Propuesta creada");
       await loadProposals();
@@ -1432,7 +352,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const eth = q("buyEth").value;
       if (!eth) return alert("Ingrese ETH");
       const value = ethers.parseEther(eth);
-      const tx = await daoContract.buyTokens({ value });
+      
+      const tx = await daoTokenContract.buyTokens({ value });
       await tx.wait();
       alert("Tokens comprados");
     } catch (e) { alertErr(e); }
@@ -1440,7 +361,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   q("btnActivatePanic")?.addEventListener("click", async () => {
     try {
-      const tx = await daoContract.panic();
+      const tx = await daoCoreContract.panic();
       await tx.wait();
       alert("PÁNICO ACTIVADO");
       await initDAO();
@@ -1449,7 +370,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   q("btnRestoreNormal")?.addEventListener("click", async () => {
     try {
-      const tx = await daoContract.tranquility();
+      const tx = await daoCoreContract.tranquility();
       await tx.wait();
       alert("Tranquilidad restaurada");
       await initDAO();
@@ -1461,7 +382,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const amount = q("mintAmount").value;
       if (!amount) return alert("Ingrese amount");
 
-      const tx = await daoContract.mintTokens(amount);
+      const tx = await daoTokenContract.mintTokens(amount);
       await tx.wait();
 
       alert("Tokens minteados");
@@ -1473,39 +394,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const addr = q("addrToCheck").value.trim();
       if (!addr) return alert("Ingrese una dirección");
 
-      const balance = await daoContract.getUserTokenBalance(addr);
-      const staking = await daoContract.getUserStaking(addr);
-
-      let html = `
-        <h5>Balance: ${balance.toString()} tokens</h5>
-        <hr>
-        <h6>Staking por propuesta:</h6>
-      `;
-
-      for (let i = 0; i < staking.proposalIds.length; i++) {
-        html += `
-          <div class="border p-2 mb-2 rounded">
-            <b>Propuesta #${staking.proposalIds[i]}</b><br>
-            🟦 Stake de voto: ${staking.voteStakes[i]}<br>
-            🟥 Stake de propuesta: ${staking.proposalStakes[i]}
-          </div>
-        `;
-      }
-
-      q("stakesResult").innerHTML = html;
-
-    } catch (e) {
-      alertErr(e);
-    }
-  });
-
-  q("btnCheckStakes")?.addEventListener("click", async () => {
-    try {
-      const addr = q("addrToCheck").value.trim();
-      if (!addr) return alert("Ingrese una dirección");
-
-      const balance = await daoContract.getUserTokenBalance(addr);
-      const staking = await daoContract.getUserStaking(addr);
+      const balance = await daoViewsContract.getUserTokenBalance(addr);
+      const staking = await daoViewsContract.getUserStaking(addr);
 
       let html = `
         <h5>Balance: ${balance.toString()} tokens</h5>
@@ -1543,7 +433,7 @@ window.addEventListener("DOMContentLoaded", () => {
         return alert("Complete todos los campos de parámetros");
       }
 
-      const tx = await daoContract.updateParams(
+      const tx = await daoCoreContract.updateParams(
         safeBigIntFromInput(price),
         safeBigIntFromInput(minVote),
         safeBigIntFromInput(minProp),
@@ -1561,7 +451,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const newOwner = q("newOwnerAddr").value.trim();
       if (!newOwner) return alert("Ingrese una dirección");
 
-      const tx = await daoContract.transferOwnership(newOwner);
+      const tx = await daoCoreContract.changeOwner(newOwner);
       await tx.wait();
       alert("Ownership transferido");
       await initDAO();
@@ -1573,7 +463,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const wallet = q("panicWalletAddr").value.trim();
       if (!wallet) return alert("Ingrese una dirección");
 
-      const tx = await daoContract.setPanicWallet(wallet);
+      const tx = await daoCoreContract.setPanicWallet(wallet);
       await tx.wait();
       alert("Panic wallet configurada");
       await initDAO();
@@ -1585,9 +475,18 @@ window.addEventListener("DOMContentLoaded", () => {
       const proposalId = q("unstakeProposalId").value.trim();
       if (!proposalId) return alert("Ingrese un ID de propuesta");
 
-      const tx = await daoContract.unstakeProposal(safeBigIntFromInput(proposalId));
+      const tx = await daoCoreContract.unstakeProposal(safeBigIntFromInput(proposalId));
       await tx.wait();
       alert("Tokens desbloqueados de la propuesta");
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnToggleVotingMode")?.addEventListener("click", async () => {
+    try {
+      const tx = await daoCoreContract.toggleVotingMode();
+      await tx.wait();
+      alert("Modo de votación cambiado");
+      await updateVotingModeUI();
     } catch (e) { alertErr(e); }
   });
 
@@ -1599,10 +498,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
       let proposals;
       if (filter === "ALL") {
-        proposals = await daoContract.getAllProposals();
+        proposals = await daoViewsContract.getAllProposals();
       } else {
         const statusMap = { "ACTIVE": 0, "ACCEPTED": 1, "REJECTED": 2 };
-        proposals = await daoContract.getProposalsByStatus(statusMap[filter]);
+        proposals = await daoViewsContract.getProposalsByStatus(statusMap[filter]);
       }
 
       list.innerHTML = "";
@@ -1628,6 +527,7 @@ window.addEventListener("DOMContentLoaded", () => {
             <button class="btn btn-sm btn-success me-1" onclick="vote(${id}, true)">Votar a favor</button>
             <button class="btn btn-sm btn-danger me-1" onclick="vote(${id}, false)">Votar en contra</button>
             <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">Finalizar</button>
+            <button class="btn btn-sm btn-info" onclick="showDelegationOptions(${id})">Delegar</button>
           </div>
         `;
         list.appendChild(el);
@@ -1635,6 +535,117 @@ window.addEventListener("DOMContentLoaded", () => {
 
     } catch (e) {
       console.error("Error filtering proposals", e);
+    }
+  });
+
+  q("btnDelegateVote")?.addEventListener("click", async () => {
+    try {
+      const proposalId = q("delegateProposalId").value.trim();
+      const delegateAddr = q("delegateAddress").value.trim();
+      const amount = q("delegateAmount").value.trim();
+
+      if (!proposalId || !delegateAddr || !amount) {
+        return alert("Complete todos los campos");
+      }
+
+      const stake = safeBigIntFromInput(amount);
+      const tx = await daoDelegationContract.delegateVote(
+        safeBigIntFromInput(proposalId),
+        delegateAddr,
+        stake
+      );
+      await tx.wait();
+      
+      alert("✅ Voto delegado exitosamente");
+      
+      q("delegateProposalId").value = "";
+      q("delegateAddress").value = "";
+      q("delegateAmount").value = "";
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnVoteWithDelegation")?.addEventListener("click", async () => {
+    try {
+      const proposalId = q("voteWithDelegationProposalId").value.trim();
+      const delegatorAddr = q("delegatorAddress").value.trim();
+      const inFavor = q("delegatedVoteChoice").value === "true";
+
+      if (!proposalId || !delegatorAddr) {
+        return alert("Complete todos los campos");
+      }
+
+      const tx = await daoDelegationContract.voteWithDelegation(
+        safeBigIntFromInput(proposalId),
+        delegatorAddr,
+        inFavor
+      );
+      await tx.wait();
+      
+      alert("✅ Voto con delegación registrado");
+      await loadProposals();
+      
+      q("voteWithDelegationProposalId").value = "";
+      q("delegatorAddress").value = "";
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnRevokeDelegation")?.addEventListener("click", async () => {
+    try {
+      const proposalId = q("revokeProposalId").value.trim();
+
+      if (!proposalId) {
+        return alert("Ingrese el ID de la propuesta");
+      }
+
+      const tx = await daoDelegationContract.revokeDelegation(
+        safeBigIntFromInput(proposalId)
+      );
+      await tx.wait();
+      
+      alert("✅ Delegación revocada");
+      
+      // Limpiar campo
+      q("revokeProposalId").value = "";
+    } catch (e) { alertErr(e); }
+  });
+
+  q("btnCheckDelegation")?.addEventListener("click", async () => {
+    try {
+      const proposalId = q("checkDelegationProposalId").value.trim();
+      const addr = q("checkDelegationAddress").value.trim();
+
+      if (!proposalId || !addr) {
+        return alert("Complete todos los campos");
+      }
+
+      const [delegate, amount, active] = await daoViewsContract.getDelegationInfo(
+        safeBigIntFromInput(proposalId),
+        addr
+      );
+
+      const resultDiv = q("delegationResult");
+      
+      if (delegate === ethers.ZeroAddress) {
+        resultDiv.innerHTML = `
+          <div class="alert alert-info">
+            <strong>ℹ️ No hay delegación activa</strong><br>
+            Esta dirección no ha delegado su voto para esta propuesta.
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="alert alert-${active ? 'success' : 'warning'}">
+            <h6><strong>📋 Información de Delegación</strong></h6>
+            <hr>
+            <p><strong>Delegado:</strong> ${fmtAddr(delegate)}</p>
+            <p><strong>Cantidad:</strong> ${amount.toString()} tokens</p>
+            <p><strong>Estado:</strong> ${active ? '✅ Activa' : '❌ Inactiva (ya fue usada o revocada)'}</p>
+          </div>
+        `;
+      }
+    } catch (e) { 
+      alertErr(e);
+      q("delegationResult").innerHTML = "";
     }
   });
 });

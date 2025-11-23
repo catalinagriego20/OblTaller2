@@ -14,6 +14,21 @@
     .btn-right { width: 15%; float: right; display: block; margin-left: auto; }
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     .top-bar h2 { margin: 0; }
+    .delegation-badge { 
+      display: inline-block; 
+      background: #e3f2fd; 
+      color: #1976d2; 
+      padding: 4px 12px; 
+      border-radius: 12px; 
+      font-size: 0.85rem;
+      margin-left: 8px;
+    }
+    .delegation-section {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body class="p-4">
@@ -24,6 +39,9 @@
       <button class="btn btn-outline-primary" id="connectWalletBtn">Conectar Wallet</button>
     </div>
 
+    <div id="panicMsg" class="alert alert-warning text-center" style="display:none;"></div>
+    <div id="votingModeStatus" class="alert alert-info text-center"></div>
+
     <!-- NAV TABS -->
     <ul class="nav nav-tabs" id="daoTabs" role="tablist">
       <li class="nav-item">
@@ -31,6 +49,9 @@
       </li>
       <li class="nav-item">
         <button class="nav-link" id="proposals-tab" data-bs-toggle="tab" data-bs-target="#proposals" type="button" role="tab">Propuestas</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="delegation-tab" data-bs-toggle="tab" data-bs-target="#delegation" type="button" role="tab"> Delegación</button>
       </li>
       <li class="nav-item">
         <button class="nav-link" id="tokens-tab" data-bs-toggle="tab" data-bs-target="#tokens" type="button" role="tab">Tokens & Staking</button>
@@ -87,6 +108,13 @@
             <button class="btn btn-secondary btn-right mt-3" id="btnUpdateParams">Actualizar Parámetros</button>
           </div>
 
+          <!-- Voting Mode Toggle -->
+          <div class="mb-4">
+            <h5>Modo de Votación</h5>
+            <p class="text-muted small">Lineal: 1 token = 1 voto | Cuadrático: Voto = √(tokens/tokensPerVP)</p>
+            <button class="btn btn-info btn-right" id="btnToggleVotingMode">Cambiar Modo</button>
+          </div>
+
           <!-- Transfer Ownership -->
           <div class="mb-4">
             <h5>Transferir Ownership</h5>
@@ -110,20 +138,139 @@
         <div class="card p-4 mt-3">
           <h4>Crear Propuesta</h4>
           <input type="text" id="propTitle" class="form-control mb-2" placeholder="Título">
-          <textarea id="propDesc" class="form-control mb-2" placeholder="Descripción"></textarea>
+          <textarea id="propDesc" class="form-control mb-2" placeholder="Descripción" rows="3"></textarea>
           <input type="number" id="propStake" class="form-control mb-2" placeholder="Tokens a stakear">
           <button class="btn btn-success btn-full" id="btnCreateProp">Crear Propuesta</button>
         </div>
 
         <div class="card p-4 mt-4">
-          <h4>Listado de Propuestas</h4>
-          <select id="filterStatus" class="form-select my-2 w-auto">
-            <option value="ALL">Todas</option>
-            <option value="ACTIVE">Activas</option>
-            <option value="ACCEPTED">Aprobadas</option>
-            <option value="REJECTED">Rechazadas</option>
-          </select>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Listado de Propuestas</h4>
+            <select id="filterStatus" class="form-select w-auto">
+              <option value="ALL">Todas</option>
+              <option value="ACTIVE">Activas</option>
+              <option value="ACCEPTED">Aprobadas</option>
+              <option value="REJECTED">Rechazadas</option>
+            </select>
+          </div>
           <div id="proposalsList"></div>
+        </div>
+      </div>
+
+      <!-- DELEGATION TAB -->
+      <div class="tab-pane fade" id="delegation" role="tabpanel">
+        
+        <!-- Delegar Voto -->
+        <div class="card p-4 mt-3">
+          <h4>🤝 Delegar tu Voto</h4>
+          <p class="text-muted">Permite que otra persona vote en tu nombre en una propuesta específica.</p>
+          <hr>
+          
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">ID de la Propuesta</label>
+              <input type="number" id="delegateProposalId" class="form-control" placeholder="Ej: 1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Dirección del Delegado</label>
+              <input type="text" id="delegateAddress" class="form-control" placeholder="0x...">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cantidad de Tokens</label>
+              <input type="number" id="delegateAmount" class="form-control" placeholder="Ej: 50">
+            </div>
+          </div>
+          
+          <button class="btn btn-primary btn-right mt-3" id="btnDelegateVote">
+            Delegar Voto
+          </button>
+        </div>
+
+        <!-- Votar con Delegación -->
+        <div class="card p-4 mt-4">
+          <h4>🗳️ Votar Usando Delegación Recibida</h4>
+          <p class="text-muted">Usa los votos que alguien te delegó para votar en su nombre.</p>
+          <hr>
+          
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">ID de la Propuesta</label>
+              <input type="number" id="voteWithDelegationProposalId" class="form-control" placeholder="Ej: 1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Dirección del Delegador</label>
+              <input type="text" id="delegatorAddress" class="form-control" placeholder="0x... (quien te delegó)">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Voto</label>
+              <select id="delegatedVoteChoice" class="form-select">
+                <option value="true">✅ A Favor</option>
+                <option value="false">❌ En Contra</option>
+              </select>
+            </div>
+          </div>
+          
+          <button class="btn btn-success btn-right mt-3" id="btnVoteWithDelegation">
+            Votar con Delegación
+          </button>
+        </div>
+
+        <!-- Revocar Delegación -->
+        <div class="card p-4 mt-4">
+          <h4>🚫 Revocar Delegación</h4>
+          <p class="text-muted">Cancela una delegación que hiciste (solo si el delegado aún no votó).</p>
+          <hr>
+          
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">ID de la Propuesta</label>
+              <input type="number" id="revokeProposalId" class="form-control" placeholder="Ej: 1">
+            </div>
+          </div>
+          
+          <button class="btn btn-warning btn-right mt-3" id="btnRevokeDelegation">
+            Revocar Delegación
+          </button>
+        </div>
+
+        <!-- Consultar Delegación -->
+        <div class="card p-4 mt-4">
+          <h4>🔍 Consultar Delegación</h4>
+          <p class="text-muted">Verifica si existe una delegación activa.</p>
+          <hr>
+          
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">ID de la Propuesta</label>
+              <input type="number" id="checkDelegationProposalId" class="form-control" placeholder="Ej: 1">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Dirección a Consultar</label>
+              <input type="text" id="checkDelegationAddress" class="form-control" placeholder="0x...">
+            </div>
+          </div>
+          
+          <button class="btn btn-info btn-right mt-3" id="btnCheckDelegation">
+            Consultar Delegación
+          </button>
+          
+          <div id="delegationResult" class="mt-3"></div>
+        </div>
+
+        <!-- Ayuda -->
+        <div class="card p-4 mt-4 bg-light">
+          <h5>ℹ️ ¿Cómo funciona la delegación?</h5>
+          <ol class="mb-0">
+            <li><strong>Delegar:</strong> Le das tu poder de voto a otra persona para una propuesta específica.</li>
+            <li><strong>El delegado vota:</strong> La persona a quien delegaste usa tus tokens para votar.</li>
+            <li><strong>Restricciones:</strong>
+              <ul>
+                <li>No puedes votar directamente si ya delegaste</li>
+                <li>Solo puedes revocar si el delegado aún no votó</li>
+                <li>Una vez que el delegado vota, la delegación se consume</li>
+              </ul>
+            </li>
+          </ol>
         </div>
       </div>
 
@@ -159,6 +306,7 @@
         </div>
       </div>
 
+    </div>
   </div>
 
   <!-- Bootstrap JS -->

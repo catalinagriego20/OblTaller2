@@ -1,216 +1,204 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("DAO Full Coverage", () => {
-    let DAO, dao;
-    let Token, token;
-    let Staking, staking;
-    let owner, multisig, panicWallet, addr1, addr2, outsider;
+describe("DAOToken - Full Coverage", function () {
+  let daoCore, daoToken, token;
+  let owner, alice, bob, panicWallet;
 
-    beforeEach(async () => {
-        [owner, multisig, panicWallet, addr1, addr2, outsider] = await ethers.getSigners();
+  const PRICE = ethers.parseEther("0.001"); // 0.001 ETH per token
+  const MIN_STAKE_VOTE = 10n;
+  const MIN_STAKE_PROPOSAL = 20n;
+  const VOTING_PERIOD = 60 * 60 * 24;
+  const TOKENS_PER_VP = 1n;
+  const LOCK_TIME = 60 * 60;
 
-        Token = await ethers.getContractFactory("DAOToken");
-        token = await Token.deploy(owner.address);
-        await token.waitForDeployment();
+  beforeEach(async function () {
+    [owner, alice, bob, panicWallet] = await ethers.getSigners();
 
-        Staking = await ethers.getContractFactory("MockStaking");
-        staking = await Staking.deploy();
-        await staking.waitForDeployment();
+    // Deploy Mock Token
+    const MockTokenFactory = await ethers.getContractFactory("MockToken");
+    token = await MockTokenFactory.deploy();
+    await token.waitForDeployment();
 
-        DAO = await ethers.getContractFactory("DAO");
-        dao = await DAO.deploy(
-            token.target,
-            multisig.address,
-            100,
-            10,
-            20,
-            60,
-            10,
-            30
-        );
-        await dao.waitForDeployment();
+    // Deploy DAOCore
+    const DAOCore = await ethers.getContractFactory("DAOCore");
+    daoCore = await DAOCore.deploy(
+      await token.getAddress(),
+      owner.address,
+      PRICE,
+      MIN_STAKE_VOTE,
+      MIN_STAKE_PROPOSAL,
+      VOTING_PERIOD,
+      TOKENS_PER_VP,
+      LOCK_TIME
+    );
+    await daoCore.waitForDeployment();
 
-        await dao.connect(multisig).setPanicWallet(panicWallet.address);
-        await token.connect(owner).mint(dao.target, ethers.parseUnits("1000000", 18));
-        await dao.setStakingAddress(staking.target);
+    // Deploy DAOToken
+    const DAOToken = await ethers.getContractFactory("DAOToken");
+    daoToken = await DAOToken.deploy(await daoCore.getAddress());
+    await daoToken.waitForDeployment();
+
+    // Configure
+    await daoCore.setPanicWallet(panicWallet.address);
+    await daoCore.setTokenContract(await daoToken.getAddress());
+
+    // Mint tokens to DAOToken contract for selling
+    const decimals = await token.decimals();
+    const amountToMint = ethers.parseUnits("1000000", decimals);
+    await token.mint(await daoToken.getAddress(), amountToMint);
+  });
+
+  describe("Constructor", function() {
+    it("should revert with zero DAO core address", async function () {
+      const F = await ethers.getContractFactory("DAOToken");
+      await expect(F.deploy(ethers.ZeroAddress)).to.be.revertedWith("Invalid DAO core");
     });
 
-    it("constructor configs OK", async () => {
-        expect(await dao.priceWeiPerToken()).to.equal(100);
-        expect(await dao.minStakeForVote()).to.equal(10);
-        expect(await dao.minStakeForProposal()).to.equal(20);
+    it("should set daoCore correctly", async function () {
+      expect(await daoToken.daoCore()).to.equal(await daoCore.getAddress());
+    });
+  });
+
+  describe("Buy tokens", function() {
+    it("should buy tokens successfully", async function () {
+      const weiSent = ethers.parseEther("1"); // 1 ETH
+      
+      await expect(
+        daoToken.connect(alice).buyTokens({ value: weiSent })
+      ).to.emit(daoToken, "TokensPurchased");
+
+      const decimals = await token.decimals();
+      const expectedTokens = (weiSent * BigInt(10 ** Number(decimals))) / PRICE;
+      expect(await token.balanceOf(alice.address)).to.equal(expectedTokens);
     });
 
-    it("owner puede mintear tokens", async () => {
-        await dao.connect(multisig).mintTokens(1000);
+    it("should revert with zero ETH sent", async function () {
+      await expect(
+        daoToken.connect(alice).buyTokens({ value: 0 })
+      ).to.be.revertedWith("No ETH sent");
     });
 
-    it("mintTokens falla si panicWallet no configurada (coverage require)", async () => {
-        let dao2 = await DAO.deploy(
-            token.target,
-            multisig.address,
-            100,
-            10,
-            20,
-            60,
-            10,
-            30
-        );
-        await expect(dao2.connect(multisig).mintTokens(1000))
-            .to.be.revertedWith("Panic wallet not set");
+    it("should revert when DAO has insufficient tokens", async function () {
+      // Deploy new DAOToken without minting tokens
+      const DAOToken = await ethers.getContractFactory("DAOToken");
+      const daoToken2 = await DAOToken.deploy(await daoCore.getAddress());
+      await daoToken2.waitForDeployment();
+
+      await expect(
+        daoToken2.connect(alice).buyTokens({ value: ethers.parseEther("1") })
+      ).to.be.revertedWith("Not enough tokens in DAO");
     });
 
-    it("updateParams OK", async () => {
-        await dao.connect(multisig).updateParams(200, 11, 22, 61, 9, 31);
-        expect(await dao.priceWeiPerToken()).to.equal(200);
+    it("should revert with too little ETH", async function () {
+      // Update price to very high
+      await daoCore.updateParams(
+        ethers.parseEther("1000000"), // Very expensive
+        MIN_STAKE_VOTE,
+        MIN_STAKE_PROPOSAL,
+        VOTING_PERIOD,
+        TOKENS_PER_VP,
+        LOCK_TIME
+      );
+
+      await expect(
+        daoToken.connect(alice).buyTokens({ value: 1 })
+      ).to.be.revertedWith("Too little ETH");
     });
 
-    it("changeOwner OK", async () => {
-        await dao.connect(multisig).changeOwner(addr1.address);
-        expect(await dao.owner()).to.equal(addr1.address);
+    it("should handle multiple purchases", async function () {
+      await daoToken.connect(alice).buyTokens({ value: ethers.parseEther("0.5") });
+      await daoToken.connect(bob).buyTokens({ value: ethers.parseEther("0.3") });
+
+      expect(await token.balanceOf(alice.address)).to.be.gt(0);
+      expect(await token.balanceOf(bob.address)).to.be.gt(0);
+    });
+  });
+
+  describe("Mint tokens", function() {
+    it("should mint tokens successfully", async function () {
+      const decimals = await token.decimals();
+      const amountToMint = ethers.parseUnits("1000", decimals);
+
+      const balanceBefore = await token.balanceOf(await daoToken.getAddress());
+      await daoToken.mintTokens(amountToMint);
+      const balanceAfter = await token.balanceOf(await daoToken.getAddress());
+
+      expect(balanceAfter - balanceBefore).to.equal(amountToMint);
     });
 
-    it("setPanicWallet OK", async () => {
-        await dao.connect(multisig).setPanicWallet(addr1.address);
-        expect(await dao.panicWallet()).to.equal(addr1.address);
+    it("should revert mintTokens if not owner", async function () {
+      const decimals = await token.decimals();
+      const amountToMint = ethers.parseUnits("1000", decimals);
+
+      await expect(
+        daoToken.connect(alice).mintTokens(amountToMint)
+      ).to.be.reverted;
     });
 
-    it("panic / tranquility OK", async () => {
-        await dao.connect(panicWallet).panic();
-        expect(await dao.isPanicked()).to.equal(true);
+    it("should revert mintTokens when panicked", async function () {
+      await daoCore.connect(panicWallet).panic();
 
-        await dao.connect(panicWallet).tranquility();
-        expect(await dao.isPanicked()).to.equal(false);
+      const decimals = await token.decimals();
+      const amountToMint = ethers.parseUnits("1000", decimals);
+
+      await expect(
+        daoToken.mintTokens(amountToMint)
+      ).to.be.revertedWith("Panic mode active");
+    });
+  });
+
+  describe("Panic mode", function() {
+    it("should block buyTokens when panicked", async function () {
+      await daoCore.connect(panicWallet).panic();
+
+      await expect(
+        daoToken.connect(alice).buyTokens({ value: ethers.parseEther("1") })
+      ).to.be.revertedWith("Panic mode active");
     });
 
-    it("panic fail si caller no es panic wallet", async () => {
-        await expect(dao.connect(addr1).panic())
-            .to.be.revertedWith("Only panic wallet can trigger panic");
+    it("should allow buyTokens after tranquility restored", async function () {
+      await daoCore.connect(panicWallet).panic();
+      await daoCore.connect(panicWallet).tranquility();
+
+      await expect(
+        daoToken.connect(alice).buyTokens({ value: ethers.parseEther("1") })
+      ).to.emit(daoToken, "TokensPurchased");
     });
+  });
 
-    it("buyTokens ok", async () => {
-        await dao.connect(addr1).buyTokens({ value: 100 });
-        expect(await token.balanceOf(addr1.address)).to.be.gt(0);
+  describe("Receive function", function() {
+    it("should receive ETH and call buyTokens", async function () {
+      const weiSent = ethers.parseEther("0.5");
+
+      await expect(
+        alice.sendTransaction({
+          to: await daoToken.getAddress(),
+          value: weiSent
+        })
+      ).to.emit(daoToken, "TokensPurchased");
+
+      expect(await token.balanceOf(alice.address)).to.be.gt(0);
     });
+  });
 
-    it("fail buyTokens sin tokens suficientes", async () => {
-        const smallDao = await DAO.deploy(
-            token.target,
-            multisig.address,
-            100,
-            10,
-            20,
-            60,
-            10,
-            30
-        );
-        await smallDao.connect(multisig).setPanicWallet(panicWallet.address);
-        await smallDao.setStakingAddress(staking.target);
+  describe("Price calculations", function() {
+    it("should calculate correct token amount for different ETH values", async function () {
+      const decimals = await token.decimals();
+      
+      // Test with 0.1 ETH
+      const eth1 = ethers.parseEther("0.1");
+      await daoToken.connect(alice).buyTokens({ value: eth1 });
+      
+      const expectedTokens1 = (eth1 * BigInt(10 ** Number(decimals))) / PRICE;
+      expect(await token.balanceOf(alice.address)).to.equal(expectedTokens1);
 
-        await expect(
-            smallDao.connect(addr1).buyTokens({ value: 100 })
-        ).to.be.revertedWith("Not enough tokens in DAO");
+      // Test with 0.5 ETH
+      const eth2 = ethers.parseEther("0.5");
+      await daoToken.connect(bob).buyTokens({ value: eth2 });
+      
+      const expectedTokens2 = (eth2 * BigInt(10 ** Number(decimals))) / PRICE;
+      expect(await token.balanceOf(bob.address)).to.equal(expectedTokens2);
     });
-
-    it("createProposal OK", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        expect((await dao.getAllProposals()).length).to.equal(1);
-    });
-
-    it("createProposal falla si stake insuficiente", async () => {
-        await expect(
-            dao.connect(addr1).createProposal("A", "B", 1)
-        ).to.be.revertedWith("Insufficient proposal stake");
-    });
-
-    it("vote linear ok", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await dao.connect(addr1).vote(1, true, 20);
-
-        const list = await dao.getAllProposals();
-        expect(list[0].votesFor).to.equal(2);
-    });
-
-    it("vote quadratic ok", async () => {
-        await dao.connect(multisig).toggleVotingMode();
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await dao.connect(addr1).vote(1, true, 20);
-
-        const list = await dao.getAllProposals();
-        expect(list[0].votesFor).to.equal(1);
-    });
-
-    it("vote falla si stake insuficiente", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await expect(
-            dao.connect(addr1).vote(1, true, 1)
-        ).to.be.revertedWith("Insufficient voting stake");
-    });
-
-    it("unstakeVote ok", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await dao.connect(addr1).vote(1, true, 20);
-
-        await dao.connect(addr1).unstakeVote(1);
-    });
-
-    it("unstakeVote falla si usuario no votó", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await expect(
-            dao.connect(addr1).unstakeVote(1)
-        ).to.be.revertedWith("User did not vote");
-    });
-
-    it("unstakeProposal ok", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await dao.connect(addr1).unstakeProposal(1);
-    });
-
-    it("finalize accepted", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await dao.connect(addr1).vote(1, true, 20);
-
-        await ethers.provider.send("evm_increaseTime", [1000]);
-        await ethers.provider.send("evm_mine");
-
-        await dao.finalize(1);
-        const p = (await dao.getAllProposals())[0];
-        expect(p.status).to.equal(1);
-    });
-
-    it("finalize rejected", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-
-        await ethers.provider.send("evm_increaseTime", [1000]);
-        await ethers.provider.send("evm_mine");
-
-        await dao.finalize(1);
-        const p = (await dao.getAllProposals())[0];
-        expect(p.status).to.equal(2);
-    });
-
-    it("finalize falla si no terminó periodo", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        await expect(dao.finalize(1))
-            .to.be.revertedWith("Voting period not ended");
-    });
-
-    it("getProposalsByStatus OK", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-
-        let list = await dao.getProposalsByStatus(0);
-        expect(list.length).to.equal(1);
-    });
-
-    it("isValidProposal OK", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        expect(await dao.isValidProposal(1)).to.equal(true);
-        expect(await dao.isValidProposal(99)).to.equal(false);
-    });
-
-    it("proposalCreator OK", async () => {
-        await dao.connect(addr1).createProposal("A", "B", 20);
-        expect(await dao.proposalCreator(1)).to.equal(addr1.address);
-    });
+  });
 });
