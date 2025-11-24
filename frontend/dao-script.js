@@ -1,12 +1,4 @@
-// ---- CONFIG ----
-const CONTRACTS = {
-  daoCore: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-  daoDelegation: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-  daoToken: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-  daoViews: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-  staking: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-  token: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-};
+import { CONTRACTS } from './dao-config.js';
 
 import DAOCoreABI from './abis/DAOCore.json';
 import DAODelegationABI from './abis/DAODelegation.json';
