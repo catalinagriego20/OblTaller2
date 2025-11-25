@@ -363,6 +363,44 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getParams",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "priceWeiPerToken_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minStakeForVote_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minStakeForProposal_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "votingPeriod_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tokensPerVotingPower_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "lockTimeSeconds_",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",

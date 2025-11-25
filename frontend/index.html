@@ -12,7 +12,17 @@
     .form-label { font-weight: 500; }
     .btn-full { width: 100%; }
     .btn-right { width: 15%; float: right; display: block; margin-left: auto; }
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .top-bar > div {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
     .top-bar h2 { margin: 0; }
     .delegation-badge { 
       display: inline-block; 
@@ -29,13 +39,44 @@
       padding: 15px;
       margin-top: 10px;
     }
+    .el-propuesta {
+      border-radius: 14px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .el-propuesta:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    }
+
+    /* Estado en formato etiqueta, NO botón */
+    .estado-propuesta {
+      padding: 6px 12px;
+      border-radius: 50px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    /* Cajas para los votos */
+    .info-box {
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      font-size: 0.9rem;
+    }
+
   </style>
 </head>
 <body class="p-4">
 
   <div class="container">
     <div class="top-bar">
-      <h2>Panel de la DAO</h2>
+      <div>
+        <h2>Panel de la DAO</h2>
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#paramsModal" title="Ver Parámetros de la DAO">ℹ️ </button>
+      </div>
       <button class="btn btn-outline-primary" id="connectWalletBtn">Conectar Wallet</button>
     </div>
 
@@ -295,9 +336,15 @@
         </div>
 
         <div class="card p-4 mt-4">
-          <h4>Quitar tokens de staking</h4>
+          <h4>Quitar tokens de propuesta del staking</h4>
           <input type="number" id="unstakeProposalId" class="form-control mb-2" placeholder="ID de la propuesta">
           <button class="btn btn-danger btn-right" id="btnUnstake">Unstake Tokens</button>
+        </div>
+
+        <div class="card p-4 mt-4">
+          <h4>Quitar tokens de voto del staking</h4>
+          <input type="number" id="unstakeVoteId" class="form-control mb-2" placeholder="ID de la propuesta">
+          <button class="btn btn-danger btn-right" id="btnUnstakeVote">Unstake Tokens</button>
         </div>
       </div>
 
@@ -311,6 +358,41 @@
         </div>
       </div>
 
+    </div>
+
+    <div class="modal fade" id="paramsModal" tabindex="-1" aria-labelledby="paramsModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="paramsModalLabel">Parámetros Actuales de la DAO</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <dl class="row" id="daoParamsDisplay">
+              <dt class="col-sm-6">Precio (Wei/Token):</dt>
+              <dd class="col-sm-6" id="displayPrice">...</dd>
+
+              <dt class="col-sm-6">Mínimo Stake (Voto):</dt>
+              <dd class="col-sm-6" id="displayMinVote">...</dd>
+
+              <dt class="col-sm-6">Mínimo Stake (Propuesta):</dt>
+              <dd class="col-sm-6" id="displayMinProp">...</dd>
+
+              <dt class="col-sm-6">Período de Votación (Segundos):</dt>
+              <dd class="col-sm-6" id="displayVotingPeriod">...</dd>
+              
+              <dt class="col-sm-6">Tokens por Voto Cuadrático:</dt>
+              <dd class="col-sm-6" id="displayTokensPerVP">...</dd>
+
+              <dt class="col-sm-6">Tiempo de Bloqueo (Segundos):</dt>
+              <dd class="col-sm-6" id="displayLockTime">...</dd>
+            </dl>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

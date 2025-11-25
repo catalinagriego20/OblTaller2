@@ -366,6 +366,22 @@ contract DAOCore is Ownable {
     }
 
     // --- VISTAS PÚBLICAS ---
+    function getParams() external view returns (
+        uint256 priceWeiPerToken_,
+        uint256 minStakeForVote_,
+        uint256 minStakeForProposal_,
+        uint256 votingPeriod_,
+        uint256 tokensPerVotingPower_,
+        uint256 lockTimeSeconds_
+    ) {
+        priceWeiPerToken_ = priceWeiPerToken;
+        minStakeForVote_ = minStakeForVote;
+        minStakeForProposal_ = minStakeForProposal;
+        votingPeriod_ = votingPeriod;
+        tokensPerVotingPower_ = tokensPerVotingPower;
+        lockTimeSeconds_ = lockTimeSeconds;
+    }
+    
     function getProposal(uint256 id) external view returns (
         uint256 proposalId,
         address creator,
