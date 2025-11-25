@@ -1,15 +1,12 @@
 import { CONTRACTS } from './dao-config.js';
 
-import DAOCoreABI from './abis/DAOCore.json';
-import DAODelegationABI from './abis/DAODelegation.json';
-import DAOTokenABI from './abis/DAOToken.json';
-import DAOViewsABI from './abis/DAOViews.json';
-import SimpleMultiSigABI from './abis/SimpleMultiSig.json';
-
 let provider, signer;
 let daoCoreContract, daoDelegationContract, daoTokenContract, daoViewsContract;
 let currentAccount;
 let contractTokenDecimals = 0;
+
+// ABIs cargados dinámicamente
+let DAOCoreABI, DAODelegationABI, DAOTokenABI, DAOViewsABI, SimpleMultiSigABI;
 
 const q = id => document.getElementById(id);
 const fmtAddr = a => a ? `${a.slice(0,6)}...${a.slice(-4)}` : "-";
@@ -53,6 +50,33 @@ function safeBigIntFromInput(v) {
   if (!v) return 0n;
   if (v.includes(".")) return BigInt(Math.floor(parseFloat(v)));
   return BigInt(v);
+}
+
+// Función para cargar todos los ABIs
+async function loadABIs() {
+  try {
+    console.log("Cargando ABIs...");
+    const [core, delegation, token, views, multisig] = await Promise.all([
+      fetch('./abis/DAOCore.json').then(r => r.json()),
+      fetch('./abis/DAODelegation.json').then(r => r.json()),
+      fetch('./abis/DAOToken.json').then(r => r.json()),
+      fetch('./abis/DAOViews.json').then(r => r.json()),
+      fetch('./abis/SimpleMultiSig.json').then(r => r.json())
+    ]);
+    
+    DAOCoreABI = core;
+    DAODelegationABI = delegation;
+    DAOTokenABI = token;
+    DAOViewsABI = views;
+    SimpleMultiSigABI = multisig;
+    
+    console.log("✅ ABIs cargados correctamente");
+    return true;
+  } catch (error) {
+    console.error("❌ Error cargando ABIs:", error);
+    alert("Error al cargar los ABIs. Verificá que los archivos existan en ./abis/");
+    return false;
+  }
 }
 
 async function initDAO() {
@@ -172,16 +196,16 @@ async function loadProposals() {
           <span>🟥 En contra: <strong>${votesAgainst}</strong></span>
         </div>
         <div class="mt-3 d-flex gap-2">
-          <button class="btn btn-sm btn-success" onclick="vote(${id}, true)">
+          <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">
             ✅ Votar a favor
           </button>
-          <button class="btn btn-sm btn-danger" onclick="vote(${id}, false)">
+          <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">
             ❌ Votar en contra
           </button>
-          <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">
+          <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">
             🏁 Finalizar
           </button>
-          <button class="btn btn-sm btn-info" onclick="showDelegateModal(${id})">
+          <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">
             🤝 Delegar
           </button>
         </div>
@@ -287,9 +311,23 @@ async function updateVotingModeUI() {
   } catch {}
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+// Exponer funciones globalmente para los onclick en HTML
+window.vote = vote;
+window.finalizeProposal = finalizeProposal;
+window.showDelegateModal = showDelegateModal;
 
-  console.log("DOM listo. Inicializando listeners…");
+// Inicialización cuando el DOM está listo
+window.addEventListener("DOMContentLoaded", async () => {
+  console.log("DOM listo. Cargando ABIs...");
+  
+  // Cargar ABIs primero
+  const abisLoaded = await loadABIs();
+  if (!abisLoaded) {
+    console.error("No se pudieron cargar los ABIs. La aplicación no funcionará correctamente.");
+    return;
+  }
+
+  console.log("Inicializando listeners...");
 
   q("connectWalletBtn")?.addEventListener("click", async () => {
     try {
@@ -516,10 +554,10 @@ window.addEventListener("DOMContentLoaded", () => {
           <div class="mt-1"><small>${description}</small></div>
           <div class="mt-2">🟩 ${votesFor} / 🟥 ${votesAgainst}</div>
           <div class="mt-2">
-            <button class="btn btn-sm btn-success me-1" onclick="vote(${id}, true)">Votar a favor</button>
-            <button class="btn btn-sm btn-danger me-1" onclick="vote(${id}, false)">Votar en contra</button>
-            <button class="btn btn-sm btn-secondary" onclick="finalizeProposal(${id})">Finalizar</button>
-            <button class="btn btn-sm btn-info" onclick="showDelegationOptions(${id})">Delegar</button>
+            <button class="btn btn-sm btn-success me-1" onclick="window.vote(${id}, true)">Votar a favor</button>
+            <button class="btn btn-sm btn-danger me-1" onclick="window.vote(${id}, false)">Votar en contra</button>
+            <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">Finalizar</button>
+            <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">Delegar</button>
           </div>
         `;
         list.appendChild(el);
@@ -596,7 +634,6 @@ window.addEventListener("DOMContentLoaded", () => {
       
       alert("✅ Delegación revocada");
       
-      // Limpiar campo
       q("revokeProposalId").value = "";
     } catch (e) { alertErr(e); }
   });
