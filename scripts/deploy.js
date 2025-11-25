@@ -2,9 +2,7 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
-// ================= FRONT EXPORT =================
 async function exportFrontend(addresses) {
-  // >>> AJUSTÁ ESTO A TU PROYECTO FRONT <<<
 const path = require("path");
 
   const FRONTEND_DIR = path.join(__dirname, "..", "frontend");
@@ -54,7 +52,7 @@ export const CONTRACTS = ${JSON.stringify(contractsConfig, null, 2)};
   console.log(`✔ Config de contratos exportada al front: ${CONFIG_FILE}`);
 }
 
-// ============================= DEPLOY REAL ================================
+// ============================= DEPLOY ================================
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("Deploying with:", deployer.address);
@@ -91,7 +89,7 @@ async function main() {
 
   const daoCore = await DAOCore.deploy(
     token.target,
-    multisigOwner.target,  // owner de la DAO = multisig OWNER
+    deployer.address, // temporal para conectar staking
     priceWeiPerToken,
     minStakeVote,
     minStakeProposal,
@@ -131,51 +129,29 @@ async function main() {
   await staking.waitForDeployment();
   console.log("✔ Staking deployed at:", staking.target);
 
-  // 10) DATA PARA MULTISIG OWNER (linkeo, SIN panicWallet)
-  const dataSetStaking = daoCore.interface.encodeFunctionData(
-    "setStakingAddress",
-    [staking.target]
-  );
-  const dataSetDelegation = daoCore.interface.encodeFunctionData(
-    "setDelegationContract",
-    [daoDelegation.target]
-  );
-  const dataSetTokenContract = daoCore.interface.encodeFunctionData(
-    "setTokenContract",
-    [daoToken.target]
-  );
+  // 10) DATA PARA MULTISIG OWNER
+  console.log("\n⚙️  CONFIGURANDO DAO AUTOMÁTICAMENTE...");
 
-  const initialTokenSupply = hre.ethers.parseUnits("1000000", 18);
-  const dataMintTokens = daoToken.interface.encodeFunctionData(
-    "mintTokens",
-    [initialTokenSupply]
-  );
+  // Setear Staking
+  const txSetStaking = await daoCore.setStakingAddress(staking.target);
+  await txSetStaking.wait();
+  console.log("✔ Staking vinculado al Core");
 
-  console.log("\n" + "=".repeat(70));
-  console.log("📌 TRANSACCIONES A EJECUTAR DESDE LA MULTISIG *OWNER*");
-  console.log("   (para vincular contratos y mintear si querés)");
-  console.log("=".repeat(70));
+  // Setear Delegation
+  const txSetDelegation = await daoCore.setDelegationContract(daoDelegation.target);
+  await txSetDelegation.wait();
+  console.log("✔ Delegation vinculado al Core");
 
-  console.log("\n1️⃣  Registrar Staking en DAOCore:");
-  console.log("   Target:", daoCore.target);
-  console.log("   Data:", dataSetStaking);
-  console.log("   Value: 0");
+  // Setear Token Contract
+  const txSetDaoToken = await daoCore.setTokenContract(daoToken.target);
+  await txSetDaoToken.wait();
+  console.log("✔ DAOToken vinculado al Core");
 
-  console.log("\n2️⃣  Vincular DAODelegation en DAOCore:");
-  console.log("   Target:", daoCore.target);
-  console.log("   Data:", dataSetDelegation);
-  console.log("   Value: 0");
-
-  console.log("\n3️⃣  Vincular DAOToken en DAOCore:");
-  console.log("   Target:", daoCore.target);
-  console.log("   Data:", dataSetTokenContract);
-  console.log("   Value: 0");
-
-  console.log("\n4️⃣  (OPCIONAL) Mintear tokens iniciales en DAOToken:");
-  console.log("   Target:", daoToken.target);
-  console.log("   Data:", dataMintTokens);
-  console.log("   Value: 0");
-  console.log("   Nota: Esto crea", hre.ethers.formatUnits(initialTokenSupply, 18), "tokens");
+  // 11) PASO FINAL: TRANSFERIR OWNERSHIP A LA MULTISIG
+  console.log("\n🔐 TRANSFIRIENDO CONTROL A LA MULTISIG...");
+  const txTransfer = await daoCore.changeOwner(multisigOwner.target);
+  await txTransfer.wait();
+  console.log("✔ Ownership transferido a Multisig Owner");
 
   console.log("\n" + "=".repeat(70));
   console.log("🎉 DEPLOY COMPLETO");
@@ -194,7 +170,7 @@ async function main() {
   console.log("   Staking:        ", staking.target);
   console.log("   Deployer:       ", deployer.address);
 
-  // 11) GUARDAR DIRECCIONES
+  // 12) GUARDAR DIRECCIONES
   const addresses = {
     multisigOwner:   multisigOwner.target,
     multisigPanic:   multisigPanic.target,
@@ -218,12 +194,12 @@ async function main() {
   fs.writeFileSync(filename, JSON.stringify(addresses, null, 2));
   console.log(`\n💾 Addresses saved to: ${filename}`);
 
-  // 12) EXPORTAR ABI + CONFIG PARA EL FRONT (opcional)
+  // 13) EXPORTAR ABI + CONFIG PARA EL FRONT (opcional)
   await exportFrontend(addresses).catch((e) => {
     console.warn("⚠️  No se pudo exportar al front:", e.message);
   });
 
-  // 13) COMANDOS DE VERIFY
+  // 14) COMANDOS DE VERIFY
   console.log("\n" + "=".repeat(70));
   console.log("📝 COMANDOS PARA VERIFICAR");
   console.log("=".repeat(70));

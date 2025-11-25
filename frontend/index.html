@@ -276,6 +276,11 @@
 
       <!-- TOKENS TAB -->
       <div class="tab-pane fade" id="tokens" role="tabpanel">
+        <div class="card p-4 mt-3 bg-light">
+          <h4>Tu Balance de Tokens</h4>
+          <p class="mb-0">Balance actual: <strong id="userBalance">--</strong></p>
+        </div>
+
         <div class="card p-4 mt-3">
           <h4>Comprar Tokens</h4>
           <input type="number" id="buyEth" class="form-control mb-2" placeholder="Cantidad en ETH">
@@ -285,7 +290,7 @@
         <div class="card p-4 mt-4">
           <h4>Consultar Balance y Staking por dirección</h4>
           <input type="text" id="addrToCheck" class="form-control mb-2" placeholder="Dirección a consultar">
-          <button class="btn btn-primary btn-right" id="btnCheckStakes">Consultar Staking</button>
+          <button class="btn btn-primary btn-right" id="btnCheckStakes">Consultar</button>
           <div id="stakesResult" class="mt-3"></div>
         </div>
 
