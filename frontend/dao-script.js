@@ -19,12 +19,16 @@ const alertErr = e => {
   const reason =
     e.reason ||
     e.shortMessage ||
-    e.info?.error?.message ||
+    e.error?.message ||
     e.data?.message ||
-    e.message;
+    e.data?.originalError?.message ||
+    e.body?.error?.message || 
+    e.message ||
+    "Transacción fallida";
 
   showToast("Error: " + reason.replace("execution reverted: ", ""), "danger");
 };
+
 
 // 🌟 MEJORA 1: Nueva función para vaciar un conjunto de inputs 🌟
 function clearInputs(ids) {
@@ -131,9 +135,15 @@ const parseWei = (amountStr) => {
 };
 
 function safeBigIntFromInput(v) {
-  if (!v) return 0n;
-  if (v.includes(".")) return BigInt(Math.floor(parseFloat(v)));
-  return BigInt(v);
+  if (v === null || v === undefined || v === "") return 0n;
+  
+  const str = v.toString(); // convertir a string
+  
+  if (str.includes(".")) {
+    return BigInt(Math.floor(Number(str)));
+  }
+
+  return BigInt(str);
 }
 
 // --- VISIBILIDAD EN LA UI ---
@@ -484,7 +494,7 @@ function showDelegateModal(proposalId) {
     const delegateAddr = await modalInput("Dirección del delegado", "0x...");
     if (!delegateAddr) return;
 
-    const amount = await modalInput("Cantidad de tokens a delegar", "Ej: 5.2");
+    const amount = await modalInput("Cantidad de tokens a delegar", "Ej: 50");
     if (!amount) return;
 
     q("delegateProposalId").value = proposalId;
@@ -504,14 +514,29 @@ function showDelegateModal(proposalId) {
 }
 
 async function delegateVoteQuick(proposalId, delegateAddress, amountStr) {
-  if (!daoDelegationContract)
-    return showToast("Conecta tu wallet para delegar", "danger");
+  if (!daoDelegationContract || !erc20TokenContract)
+    return showToast("Conecta tu wallet y asegúrate de cargar el contrato del token.", "danger");
 
   try {
     const stake = parseTokens(amountStr);
     if (stake === 0n)
       return showToast("Monto de delegación inválido o cero.", "danger");
 
+    // 🚨 CORRECCIÓN: Obtener la dirección del contrato de Staking para aprobar
+    const stakingAddr = await daoCoreContract.staking();
+    if (!stakingAddr || stakingAddr === ethers.ZeroAddress)
+      return showToast("El contrato de Staking no está configurado correctamente.", "danger");
+
+    // 🚨 CORRECCIÓN: Aprobar tokens antes de delegar
+    const confirmApprove = await modalConfirm(`Se solicitará aprobación para usar ${amountStr} tokens en la delegación. ¿Continuar?`);
+    if (!confirmApprove) return;
+
+    showToast("Aprobando tokens...", "info");
+    const approveTx = await erc20TokenContract.approve(stakingAddr, stake);
+    await approveTx.wait();
+    showToast("Aprobación exitosa. Delegando voto...", "info");
+
+    // Ahora sí delegamos
     const tx = await daoDelegationContract.delegateVote(
       safeBigIntFromInput(proposalId),
       delegateAddress,
@@ -521,6 +546,7 @@ async function delegateVoteQuick(proposalId, delegateAddress, amountStr) {
 
     showToast("Voto delegado exitosamente", "success");
     await loadProposals();
+    await loadUserBalance();
     clearInputs(["delegateProposalId", "delegateAddress", "delegateAmount"]);
 
   } catch (e) { alertErr(e); }

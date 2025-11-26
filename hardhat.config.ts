@@ -8,7 +8,7 @@ const config: HardhatUserConfig = {
     ganache: {
       url: "http://127.0.0.1:8545", // RPC de Ganache
       accounts: [
-        "0x18382a662a81201bfe891cfbcd4bad9b7a7e5ccfc617fb52ecfb6ed31a12f959"
+        "0x7907cf2ed8121548ba84fa3f7043dfbe7431ce238c4e6dbc8797511f44346a93" //PK
       ],
       chainId: 1337,
     },

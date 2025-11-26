@@ -14,7 +14,8 @@ interface IDAO {
 
 contract Staking {
     IERC20 public immutable token;
-    address public immutable dao;
+    address public immutable daoCore;
+    address public immutable daoDelegation;
 
 
     struct StakeInfo {
@@ -22,7 +23,6 @@ contract Staking {
         uint256 unlockAt;
         bool exists;
     }
-
 
     mapping(address => mapping(uint256 => StakeInfo)) private _voteStakes;
     mapping(address => mapping(uint256 => StakeInfo)) private _proposalStakes;
@@ -35,19 +35,20 @@ contract Staking {
 
 
     modifier onlyDAO() {
-        require(msg.sender == dao, "Staking: not DAO");
+        require(msg.sender == daoCore || msg.sender == daoDelegation, "Staking: not DAO");
         _;
     }
 
 
-    constructor(address _token, address _dao) {
-        require(_token != address(0) && _dao != address(0), "Invalid address");
+    constructor(address _token, address _daoCore, address _daoDelegation) {
+        require(_token != address(0) && _daoCore != address(0) && _daoDelegation != address(0), "Invalid address");
         token = IERC20(_token);
-        dao = _dao;
+        daoCore = _daoCore;
+        daoDelegation = _daoDelegation;
     }
 
     function stakeVote(address user, uint256 amount, uint256 proposalId) external onlyDAO {
-        require(IDAO(dao).isValidProposal(proposalId), "Invalid proposal");
+        require(IDAO(daoCore).isValidProposal(proposalId), "Invalid proposal");
         require(amount > 0, "Invalid amount");
 
 
@@ -56,7 +57,7 @@ contract Staking {
         s.exists = true;
 
 
-        uint256 lt = IDAO(dao).lockTime();
+        uint256 lt = IDAO(daoCore).lockTime();
         uint256 newUnlock = block.timestamp + lt;
         if (newUnlock > s.unlockAt) s.unlockAt = newUnlock;
 
@@ -81,11 +82,11 @@ contract Staking {
     }
 
     function stakeProposal(address user, uint256 amount, uint256 proposalId) external onlyDAO {
-        require(IDAO(dao).isValidProposal(proposalId), "Invalid proposal");
+        require(IDAO(daoCore).isValidProposal(proposalId), "Invalid proposal");
         require(amount > 0, "Invalid amount");
 
 
-        address creator = IDAO(dao).proposalCreator(proposalId);
+        address creator = IDAO(daoCore).proposalCreator(proposalId);
         require(creator == user, "Only proposal creator can stake");
 
 
@@ -94,7 +95,7 @@ contract Staking {
         s.exists = true;
 
 
-        uint256 lt = IDAO(dao).lockTime();
+        uint256 lt = IDAO(daoCore).lockTime();
         uint256 newUnlock = block.timestamp + lt;
         if (newUnlock > s.unlockAt) s.unlockAt = newUnlock;
 
@@ -108,7 +109,7 @@ contract Staking {
         require(s.exists, "No proposal stake");
         require(block.timestamp >= s.unlockAt, "Locked stake");
 
-        address creator = IDAO(dao).proposalCreator(proposalId);
+        address creator = IDAO(daoCore).proposalCreator(proposalId);
         require(creator == user, "Only proposal creator can unstake");
 
         uint256 amount = s.amount;

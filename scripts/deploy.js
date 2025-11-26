@@ -125,7 +125,7 @@ async function main() {
 
   // 9) STAKING
   const Staking = await hre.ethers.getContractFactory("Staking");
-  const staking = await Staking.deploy(token.target, daoCore.target);
+  const staking = await Staking.deploy(token.target, daoCore.target, daoDelegation.target);
   await staking.waitForDeployment();
   console.log("✔ Staking deployed at:", staking.target);
 

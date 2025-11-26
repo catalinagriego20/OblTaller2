@@ -212,18 +212,18 @@ contract DAOCore is Ownable {
         emit ParamsUpdated(_priceWeiPerToken, _minStakeVote, _minStakeProposal, _votingPeriodSeconds, _tokensPerVotingPower, _lockTimeSeconds);
     }
 
-    function changeOwner(address newOwner) external onlyMultisigOwner {
+    function changeOwner(address newOwner) external onlyMultisigOwner notPanicked {
         require(newOwner != address(0), "Invalid new owner");
         transferOwnership(newOwner);
     }
 
-    function setPanicWallet(address _wallet) external onlyMultisigOwner {
+    function setPanicWallet(address _wallet) external onlyMultisigOwner notPanicked {
         require(_wallet != address(0), "Invalid wallet");
         panicWallet = _wallet;
         emit PanicSet(_wallet);
     }
 
-    function toggleVotingMode() external onlyMultisigOwner panicConfigured {
+    function toggleVotingMode() external onlyMultisigOwner panicConfigured notPanicked {
         votingMode = (votingMode == VotingMode.LINEAR) ? VotingMode.QUADRATIC : VotingMode.LINEAR;
         emit VotingModeToggled(votingMode);
     }
@@ -292,7 +292,7 @@ contract DAOCore is Ownable {
         staking.stakeVote(msg.sender, stakingAmount, id);
     }
 
-    function recordDelegatedVote(uint256 id, address voter, bool inFavor, uint256 votingPower) external {
+    function recordDelegatedVote(uint256 id, address voter, bool inFavor, uint256 votingPower) external notPanicked {
         require(msg.sender == address(delegation), "Only delegation contract");
         
         Proposal storage p = _proposals[id];

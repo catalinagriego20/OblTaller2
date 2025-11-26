@@ -8,7 +8,12 @@
       },
       {
         "internalType": "address",
-        "name": "_dao",
+        "name": "_daoCore",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_daoDelegation",
         "type": "address"
       }
     ],
@@ -117,7 +122,20 @@
   },
   {
     "inputs": [],
-    "name": "dao",
+    "name": "daoCore",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "daoDelegation",
     "outputs": [
       {
         "internalType": "address",
