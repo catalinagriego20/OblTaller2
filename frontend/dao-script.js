@@ -28,9 +28,9 @@ const alertErr = e => {
 
 // 🌟 MEJORA 1: Nueva función para vaciar un conjunto de inputs 🌟
 /**
- * Vacía los valores de los inputs especificados por sus IDs.
- * @param {string[]} ids Array de IDs de inputs a vaciar.
- */
+ * Vacía los valores de los inputs especificados por sus IDs.
+ * @param {string[]} ids Array de IDs de inputs a vaciar.
+ */
 function clearInputs(ids) {
   ids.forEach(id => {
     const el = q(id);
@@ -90,7 +90,7 @@ function safeBigIntFromInput(v) {
   return BigInt(v);
 }
 
-// ... (Resto de funciones de visibilidad y carga de ABIs) ...
+// --- Funciones de Visibilidad y Carga de ABIs ---
 
 const setOwnerUIVisible = visible => {
   // Lista de IDs de la UI que solo el Owner puede usar
@@ -132,7 +132,6 @@ const setWalletUIVisible = visible => {
 
 // Función para cargar todos los ABIs
 async function loadABIs() {
-// ... (sin cambios)
   try {
     console.log("Cargando ABIs...");
     const [core, delegation, token, views, multisig] = await Promise.all([
@@ -160,7 +159,6 @@ async function loadABIs() {
 
 // --- FUNCIÓN PARA MOSTRAR EL BALANCE ACTUALIZADO ---
 async function loadUserBalance() {
-// ... (sin cambios)
   // Verificamos la nueva variable global del contrato ERC20
   if (!erc20TokenContract || !currentAccount) return;
   
@@ -177,47 +175,42 @@ async function loadUserBalance() {
   }
 }
 
-// 🌟 MEJORA 2: Función para cargar los parámetros actuales de la DAO en los inputs 🌟
+// 🌟 MEJORA 2: Función para cargar los parámetros actuales de la DAO en los inputs y displays 🌟
 async function loadDAOCurrentParams() {
-    if (!daoCoreContract) return;
+    if (!daoCoreContract) return;
 
-    try {
-        const params = await daoCoreContract.getParams();
-        const [price, minVote, minProp, votingPeriod, tokensPerVP, lockTime] = params;
+    try {
+        const params = await daoCoreContract.getParams();
+        const [price, minVote, minProp, votingPeriod, tokensPerVP, lockTime] = params;
 
-        // Usamos formatTokens/formatEther para valores que el usuario espera ver con decimales
-        const formattedPrice = ethers.formatEther(price); // Price is in Wei (18 decimals)
-        const formattedMinVote = formatTokens(minVote);
-        const formattedMinProp = formatTokens(minProp);
-        const formattedTokensPerVP = formatTokens(tokensPerVP);
-        
-        // Estos son enteros, solo convertimos a string
-        const formattedVotingPeriod = votingPeriod.toString();
-        const formattedLockTime = lockTime.toString();
-        
-        // Pre-cargar los inputs si existen (ESTA PARTE ESTÁ CORRECTA)
-        if (q("paramPrice")) q("paramPrice").value = formattedPrice;
-        if (q("paramMinVote")) q("paramMinVote").value = formattedMinVote;
-        if (q("paramMinProp")) q("paramMinProp").value = formattedMinProp;
-        if (q("paramVotingPeriod")) q("paramVotingPeriod").value = formattedVotingPeriod;
-        if (q("paramTokensPerVP")) q("paramTokensPerVP").value = formattedTokensPerVP;
-        if (q("paramLockTime")) q("paramLockTime").value = formattedLockTime;
+        const formattedPrice = ethers.formatEther(price);
+        const formattedMinVote = formatTokens(minVote);
+        const formattedMinProp = formatTokens(minProp);
+        const formattedTokensPerVP = tokensPerVP.toString();
+        const formattedVotingPeriod = votingPeriod.toString();
+        const formattedLockTime = lockTime.toString();
+        
+        // --- PRE-CARGAR LOS INPUTS ---
+        if (q("paramPrice")) q("paramPrice").value = formattedPrice;
+        if (q("paramMinVote")) q("paramMinVote").value = formattedMinVote;
+        if (q("paramMinProp")) q("paramMinProp").value = formattedMinProp;
+        if (q("paramVotingPeriod")) q("paramVotingPeriod").value = formattedVotingPeriod;
+        if (q("paramTokensPerVP")) q("paramTokensPerVP").value = formattedTokensPerVP; // <--- Usa el valor corregido
+        if (q("paramLockTime")) q("paramLockTime").value = formattedLockTime;
 
-        // 👇 CAMBIO CLAVE AQUÍ: Actualizamos los elementos de la MODAL (displayPrice, etc.)
-        
-        if (q("displayPrice")) q("displayPrice").innerText = formattedPrice;
-        if (q("displayMinVote")) q("displayMinVote").innerText = formattedMinVote;
-        if (q("displayMinProp")) q("displayMinProp").innerText = formattedMinProp;
-        if (q("displayVotingPeriod")) q("displayVotingPeriod").innerText = formattedVotingPeriod;
-        if (q("displayTokensPerVP")) q("displayTokensPerVP").innerText = formattedTokensPerVP;
-        if (q("displayLockTime")) q("displayLockTime").innerText = formattedLockTime;
-        
+        // --- ACTUALIZAR LOS DISPLAYS ---
+        if (q("displayPrice")) q("displayPrice").innerText = formattedPrice;
+        if (q("displayMinVote")) q("displayMinVote").innerText = formattedMinVote;
+        if (q("displayMinProp")) q("displayMinProp").innerText = formattedMinProp;
+        if (q("displayVotingPeriod")) q("displayVotingPeriod").innerText = formattedVotingPeriod;
+        if (q("displayTokensPerVP")) q("displayTokensPerVP").innerText = formattedTokensPerVP; // <--- Usa el valor corregido
+        if (q("displayLockTime")) q("displayLockTime").innerText = formattedLockTime;
+        
 
-    } catch (e) {
-        console.error("Error loading DAO parameters:", e);
-        // Si tienes el elemento daoParamsDisplay, puedes actualizarlo con el error
-        if (q("daoParamsDisplay")) q("daoParamsDisplay").innerHTML = "<p>Error al cargar parámetros de la DAO.</p>";
-    }
+    } catch (e) {
+        console.error("Error loading DAO parameters:", e);
+        if (q("daoParamsDisplay")) q("daoParamsDisplay").innerHTML = "<p>Error al cargar parámetros de la DAO.</p>";
+    }
 }
 
 async function initDAO() {
@@ -343,55 +336,51 @@ async function loadProposals() {
       // mejorado para el cuerpo. (el-propuesta es una nueva clase en el CSS)
       el.className = "card mb-3 el-propuesta shadow-sm";
       el.innerHTML = `
-          <div class="card-body p-4">
+          <div class="card-body p-4">
 
-            <!-- HEADER -->
-            <div class="d-flex justify-content-between align-items-center">
-              
-              <div>
-                <h5 class="mb-1 d-flex align-items-center gap-2">
-                  <b>${title}</b>
-                  <span class="text-muted small">#${id}</span>
-                  ${delegationBadge}
-                </h5>
+                        <div class="d-flex justify-content-between align-items-center">
+              
+              <div>
+                <h5 class="mb-1 d-flex align-items-center gap-2">
+                  <b>${title}</b>
+                  <span class="text-muted small">#${id}</span>
+                  ${delegationBadge}
+                </h5>
 
-                <p class="mt-2 mb-0">
-                  <span class="fw-bold">Descripción:</span>
-                  <span class="text-muted">${description}</span>
-                </p>
-              </div>
+                <p class="mt-2 mb-0">
+                  <span class="fw-bold">Descripción:</span>
+                  <span class="text-muted">${description}</span>
+                </p>
+              </div>
 
-              <span class="estado-propuesta bg-${status === 0 ? 'primary' : status === 1 ? 'success' : 'danger'}">
-                ${statusLabel}
-              </span>
-            </div>
+              <span class="estado-propuesta bg-${status === 0 ? 'primary' : status === 1 ? 'success' : 'danger'}">
+                ${statusLabel}
+              </span>
+            </div>
 
-            <hr class="my-3">
+            <hr class="my-3">
 
-            <!-- VOTOS + BOTONES alineados -->
-            <div class="d-flex justify-content-between align-items-center flex-wrap mt-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap mt-3">
 
-              <!-- VOTOS -->
-              <div class="d-flex gap-4 flex-wrap">
-                <div class="info-box">
-                  🟩 Votos a favor: <strong>${votesFor}</strong>
-                </div>
-                <div class="info-box">
-                  🟥 Votos en contra: <strong>${votesAgainst}</strong> 
-                </div>
-              </div>
+                            <div class="d-flex gap-4 flex-wrap">
+                <div class="info-box">
+                  🟩 Votos a favor: <strong>${votesFor}</strong>
+                </div>
+                <div class="info-box">
+                  🟥 Votos en contra: <strong>${votesAgainst}</strong> 
+                </div>
+              </div>
 
-              <!-- BOTONES -->
-              <div class="d-flex gap-2 mt-2 mt-md-0">
-                <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
-                <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
-                <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
-                <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
-              </div>
+                            <div class="d-flex gap-2 mt-2 mt-md-0">
+                <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
+                <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
+                <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
+              </div>
 
-            </div>
-          </div>
-        `;
+            </div>
+          </div>
+        `;
       list.appendChild(el);
     }
 
@@ -401,50 +390,50 @@ async function loadProposals() {
 }
 
 async function vote(id, inFavor) {
-  // 1. Verificamos que existan ambos contratos (Core y el Token ERC20)
-  if (!daoCoreContract || !erc20TokenContract) return alert("❌ Conecta tu wallet y asegúrate de cargar el contrato del token.");
-  
-  try {
-    const amountStr = prompt("Tokens a stakear (ej: 1.5):"); 
-    if (!amountStr) return;
-    
-    const stake = parseTokens(amountStr);
-    if (stake === 0n) return alert("Monto de stake inválido o cero.");
-    
-    // --- 🔧 FIX: LÓGICA DE APROBACIÓN (IGUAL QUE EN CREATE PROPOSAL) ---
-    
-    // A. Obtener la dirección del contrato que guardará los tokens (Staking)
-    // Es muy probable que sea el mismo address que usaste en createProposal
-    const stakingAddr = await daoCoreContract.staking();
-    
-    if (!stakingAddr || stakingAddr === ethers.ZeroAddress) {
-       return alert("❌ El contrato de Staking no está configurado correctamente.");
-    }
+  // 1. Verificamos que existan ambos contratos (Core y el Token ERC20)
+  if (!daoCoreContract || !erc20TokenContract) return alert("❌ Conecta tu wallet y asegúrate de cargar el contrato del token.");
+  
+  try {
+    const amountStr = prompt("Tokens a stakear (ej: 1.5):"); 
+    if (!amountStr) return;
+    
+    const stake = parseTokens(amountStr);
+    if (stake === 0n) return alert("Monto de stake inválido o cero.");
+    
+    // --- 🔧 FIX: LÓGICA DE APROBACIÓN (IGUAL QUE EN CREATE PROPOSAL) ---
+    
+    // A. Obtener la dirección del contrato que guardará los tokens (Staking)
+    // Es muy probable que sea el mismo address que usaste en createProposal
+    const stakingAddr = await daoCoreContract.staking();
+    
+    if (!stakingAddr || stakingAddr === ethers.ZeroAddress) {
+       return alert("❌ El contrato de Staking no está configurado correctamente.");
+    }
 
-    // B. Aprobar los tokens antes de votar
-    // Nota: Es buena práctica chequear allowance primero, pero para simplificar hacemos approve directo
-    const confirmApprove = confirm(`Se solicitará aprobación para usar ${amountStr} tokens. ¿Continuar?`);
-    if(!confirmApprove) return;
+    // B. Aprobar los tokens antes de votar
+    // Nota: Es buena práctica chequear allowance primero, pero para simplificar hacemos approve directo
+    const confirmApprove = confirm(`Se solicitará aprobación para usar ${amountStr} tokens. ¿Continuar?`);
+    if(!confirmApprove) return;
 
-    // Ejecutamos la transacción de aprobación
-    const approveTx = await erc20TokenContract.approve(stakingAddr, stake);
-    console.log("Esperando confirmación de aprobación...");
-    await approveTx.wait();
-    alert("✅ Aprobación exitosa. Enviando voto...");
-    
-    // -------------------------------------------------------------------
+    // Ejecutamos la transacción de aprobación
+    const approveTx = await erc20TokenContract.approve(stakingAddr, stake);
+    console.log("Esperando confirmación de aprobación...");
+    await approveTx.wait();
+    alert("✅ Aprobación exitosa. Enviando voto...");
+    
+    // -------------------------------------------------------------------
 
-    // 2. Ahora sí, ejecutamos el voto
-    const tx = await daoCoreContract.vote(id, inFavor, stake);
-    await tx.wait();
-    
-    alert("✅ Voto registrado con éxito");
-    await loadProposals();
-    await loadUserBalance(); // Actualizamos balance para ver el descuento
+    // 2. Ahora sí, ejecutamos el voto
+    const tx = await daoCoreContract.vote(id, inFavor, stake);
+    await tx.wait();
+    
+    alert("✅ Voto registrado con éxito");
+    await loadProposals();
+    await loadUserBalance(); // Actualizamos balance para ver el descuento
 
-  } catch (e) { 
-    alertErr(e); 
-  }
+  } catch (e) { 
+    alertErr(e); 
+  }
 }
 
 async function finalizeProposal(id) {
@@ -781,7 +770,7 @@ q("btnCreateProp")?.addEventListener("click", async () => {
         return alert("Complete todos los campos de parámetros");
       }
 
-      // 🚨 CORRECCIÓN CLAVE: Usar las funciones de conversión adecuadas
+      // 🚨 CORRECCIÓN CLAVE: Usar las funciones de conversión adecuadas (parseWei/parseTokens)
       const tx = await daoCoreContract.updateParams(
         parseWei(price), // FIX: Price (ETH decimal -> Wei BigInt, 18 decimals)
         parseTokens(minVote), // FIX: MinVote (Token decimal -> Token Base Unit BigInt)
@@ -845,21 +834,21 @@ q("btnCreateProp")?.addEventListener("click", async () => {
     } catch (e) { alertErr(e); }
   });
 
-  q("btnUnstakeVote")?.addEventListener("click", async () => {
-      if (!daoCoreContract) return alert("❌ Conecta tu wallet para quitar stake");
+  q("btnUnstakeVote")?.addEventListener("click", async () => {
+      if (!daoCoreContract) return alert("❌ Conecta tu wallet para quitar stake");
 
-      try {
-        const proposalId = q("unstakeProposalId").value.trim();
-        if (!proposalId) return alert("Ingrese un ID de propuesta");
+      try {
+        const proposalId = q("unstakeProposalId").value.trim();
+        if (!proposalId) return alert("Ingrese un ID de propuesta");
 
-        const tx = await daoCoreContract.unstakeVote(safeBigIntFromInput(proposalId));
-        await tx.wait();
-        alert("Tokens desbloqueados de la propuesta");
-        await loadUserBalance(); // Actualizar balance
-        // 🌟 MEJORA 1: Limpiar campos 🌟
-        clearInputs(["unstakeProposalId"]);
-      } catch (e) { alertErr(e); }
-    });
+        const tx = await daoCoreContract.unstakeVote(safeBigIntFromInput(proposalId));
+        await tx.wait();
+        alert("Tokens desbloqueados de la propuesta");
+        await loadUserBalance(); // Actualizar balance
+        // 🌟 MEJORA 1: Limpiar campos 🌟
+        clearInputs(["unstakeProposalId"]);
+      } catch (e) { alertErr(e); }
+    });
 
   q("btnToggleVotingMode")?.addEventListener("click", async () => {
     if (!daoCoreContract) return alert("❌ Conecta tu wallet para cambiar el modo de votación");
@@ -879,201 +868,17 @@ q("btnCreateProp")?.addEventListener("click", async () => {
     try {
       const proposalId = q("delegateProposalId").value.trim();
       const delegateAddress = q("delegateAddress").value.trim();
-      const amount = q("delegateAmount").value.trim(); // Input en tokens
+      const amountStr = q("delegateAmount").value.trim();
 
-      if (!proposalId || !delegateAddress || !amount) {
-        return alert("Complete todos los campos de delegación");
-      }
+      if (!proposalId || !delegateAddress || !amountStr) return alert("Complete todos los campos de delegación.");
 
-      await delegateVoteQuick(safeBigIntFromInput(proposalId), delegateAddress, amount);
-
+      await delegateVoteQuick(proposalId, delegateAddress, amountStr);
     } catch (e) { alertErr(e); }
   });
 
-  q("btnVoteWithDelegation")?.addEventListener("click", async () => {
-    if (!daoDelegationContract) return alert("❌ Conecta tu wallet para votar con delegación");
-    
-    try {
-      const proposalId = q("voteWithDelegationProposalId").value.trim();
-      const delegatorAddr = q("delegatorAddress").value.trim();
-      const inFavor = q("delegatedVoteChoice").value === "true";
+// Funciones expuestas globalmente para el HTML (aunque vote ya está arriba)
+window.delegateVoteQuick = delegateVoteQuick;
+window.voteWithDelegation = voteWithDelegation;
+window.revokeDelegation = revokeDelegation;
 
-      if (!proposalId || !delegatorAddr) {
-        return alert("Complete ID de propuesta y Dirección del Delegador");
-      }
-
-      const tx = await daoDelegationContract.voteWithDelegation(
-        safeBigIntFromInput(proposalId),
-        delegatorAddr,
-        inFavor
-      );
-      await tx.wait();
-      alert("Voto con delegación registrado");
-      await loadProposals();
-      // 🌟 MEJORA 1: Limpiar campos 🌟
-      clearInputs(["voteWithDelegationProposalId", "delegatorAddress"]);
-    } catch (e) { alertErr(e); }
-  });
-
-  q("btnRevokeDelegation")?.addEventListener("click", async () => {
-    if (!daoDelegationContract) return alert("❌ Conecta tu wallet para revocar delegación");
-
-    try {
-      const proposalId = q("revokeProposalId").value.trim();
-      if (!proposalId) return alert("Ingrese ID de propuesta");
-
-      const tx = await daoDelegationContract.revokeDelegation(safeBigIntFromInput(proposalId));
-      await tx.wait();
-      alert("Delegación revocada");
-      // 🌟 MEJORA 1: Limpiar campos 🌟
-      clearInputs(["revokeProposalId"]);
-    } catch (e) { alertErr(e); }
-  });
-// ... (cierre del DOMContentLoaded)
-  q("btnCheckDelegation")?.addEventListener("click", async () => {
-    if (!daoViewsContract) return alert("❌ Conecta tu wallet para consultar delegación");
-    
-    try {
-      const proposalId = q("checkDelegationProposalId").value.trim();
-      const addr = q("checkDelegationAddress").value.trim();
-
-      if (!proposalId || !addr) {
-        return alert("Complete todos los campos");
-      }
-
-      const [delegate, amount, active] = await daoViewsContract.getDelegationInfo(
-        safeBigIntFromInput(proposalId),
-        addr
-      );
-
-      const resultDiv = q("delegationResult");
-      
-      if (delegate === ethers.ZeroAddress) {
-        resultDiv.innerHTML = `
-          <div class="alert alert-info">
-            <strong>ℹ️ No hay delegación activa</strong><br>
-            Esta dirección no ha delegado su voto para esta propuesta.
-          </div>
-        `;
-      } else {
-        // Uso de formatTokens()
-        resultDiv.innerHTML = `
-          <div class="alert alert-${active ? 'success' : 'warning'}">
-            <h6><strong>📋 Información de Delegación</strong></h6>
-            <hr>
-            <p><strong>Delegado:</strong> ${fmtAddr(delegate)}</p>
-            <p><strong>Cantidad:</strong> ${formatTokens(amount)} tokens</p>
-            <p><strong>Estado:</strong> ${active ? '✅ Activa' : '❌ Inactiva (ya fue usada o revocada)'}</p>
-          </div>
-        `;
-      }
-
-    } catch (e) { alertErr(e); }
-  });
-
-  q("filterStatus")?.addEventListener("change", async () => {
-// ... (filtro de propuestas sin cambios, pero con el nuevo estilo de loadProposals)
-    if (!daoViewsContract) return;
-
-    try {
-      const filter = q("filterStatus").value;
-      const list = q("proposalsList");
-      if (!list) return;
-
-      let proposals;
-      if (filter === "ALL") {
-        proposals = await daoViewsContract.getAllProposals();
-      } else {
-        const statusMap = { "ACTIVE": 0, "ACCEPTED": 1, "REJECTED": 2 };
-        proposals = await daoViewsContract.getProposalsByStatus(statusMap[filter]);
-      }
-
-      list.innerHTML = "";
-      for (const [idx, p] of proposals.entries()) {
-        const id = p.id ?? idx + 1;
-        const title = p.title ?? "Sin título";
-        const description = p.description ?? "";
-        // Uso de formatTokens()
-        const votesFor = formatTokens(p.votesFor) ?? "0";
-        const votesAgainst = formatTokens(p.votesAgainst) ?? "0";
-        const status = Number(p.status);
-        const statusLabel = ["Activa", "Aprobada", "Rechazada"][status] || status;
-
-        let delegationBadge = ""; // También se necesita recalcular el badge de delegación si el usuario está conectado
-        if (currentAccount && daoViewsContract) {
-          try {
-            const [delegate, amount, active] = await daoViewsContract.getDelegationInfo(
-              id,
-              currentAccount
-            );
-            if (active && delegate !== ethers.ZeroAddress) {
-              delegationBadge = `<span class="delegation-badge">🤝 Delegado a ${fmtAddr(delegate)}</span>`;
-            }
-          } catch (e) {
-            console.log("No se pudo verificar delegación:", e);
-          }
-        }
-
-        const el = document.createElement("div");
-        // 🌟 MEJORA 4: Aplica el nuevo estilo también al filtrar 🌟
-        el.className = "card mb-3 el-propuesta shadow-sm";
-        el.innerHTML = `
-          <div class="card-body p-4">
-
-            <!-- HEADER -->
-            <div class="d-flex justify-content-between align-items-center">
-              
-              <div>
-                <h5 class="mb-1 d-flex align-items-center gap-2">
-                  <b>${title}</b>
-                  <span class="text-muted small">#${id}</span>
-                  ${delegationBadge}
-                </h5>
-
-                <p class="mt-2 mb-0">
-                  <span class="fw-bold">Descripción:</span>
-                  <span class="text-muted">${description}</span>
-                </p>
-              </div>
-
-              <span class="estado-propuesta bg-${status === 0 ? 'primary' : status === 1 ? 'success' : 'danger'}">
-                ${statusLabel}
-              </span>
-            </div>
-
-            <hr class="my-3">
-
-            <!-- VOTOS + BOTONES alineados -->
-            <div class="d-flex justify-content-between align-items-center flex-wrap mt-3">
-
-              <!-- VOTOS -->
-              <div class="d-flex gap-4 flex-wrap">
-                <div class="info-box">
-                  🟩 Votos a favor: <strong>${votesFor}</strong>
-                </div>
-                <div class="info-box">
-                  🟥 Votos en contra: <strong>${votesAgainst}</strong> 
-                </div>
-              </div>
-
-              <!-- BOTONES -->
-              <div class="d-flex gap-2 mt-2 mt-md-0">
-                <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
-                <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
-                <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
-                <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
-              </div>
-
-            </div>
-
-
-          </div>
-        `;
-
-        list.appendChild(el);
-      }
-    } catch (e) {
-      alertErr(e);
-    }
-  });
 });
