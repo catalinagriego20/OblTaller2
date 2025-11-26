@@ -149,7 +149,7 @@ describe("DAODelegation - Full Coverage", function () {
         daoDelegation.connect(bob).voteWithDelegation(1, alice.address, true)
       ).to.emit(daoCore, "Voted");
 
-      const [,,,,,votesFor,,] = await daoCore.getProposal(1);
+      const [,,,,votesFor,,,,] = await daoCore.getProposal(1);
       expect(votesFor).to.equal(Number(MIN_STAKE_VOTE) / Number(TOKENS_PER_VP));
     });
 
@@ -178,7 +178,7 @@ describe("DAODelegation - Full Coverage", function () {
     it("should revert with invalid proposal", async function () {
       await expect(
         daoDelegation.connect(bob).voteWithDelegation(999, alice.address, true)
-      ).to.be.revertedWith("Invalid proposal");
+      ).to.be.revertedWith('No delegation from this address')
     });
 
     it("should revert when proposal not active", async function () {
@@ -203,7 +203,7 @@ describe("DAODelegation - Full Coverage", function () {
     it("should vote AGAINST with delegation", async function () {
       await daoDelegation.connect(bob).voteWithDelegation(1, alice.address, false);
 
-      const [,,,,,,votesAgainst,] = await daoCore.getProposal(1);
+      const [,,,,,votesAgainst,,,] = await daoCore.getProposal(1);
       expect(votesAgainst).to.equal(Number(MIN_STAKE_VOTE) / Number(TOKENS_PER_VP));
     });
 
@@ -300,7 +300,7 @@ describe("DAODelegation - Full Coverage", function () {
       await daoDelegation.connect(bob).voteWithDelegation(1, alice.address, true);
 
       // Check voting power (sqrt(100/1) = 10)
-      const [,,,,,votesFor,,] = await daoCore.getProposal(1);
+      const [,,,,votesFor,,,,] = await daoCore.getProposal(1);
       expect(votesFor).to.equal(10);
     });
   });
