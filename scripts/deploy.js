@@ -137,6 +137,8 @@ async function main() {
   await (await daoCore.setStakingAddress(staking.target)).wait();
   await (await daoCore.setDelegationContract(daoDelegation.target)).wait();
   await (await daoCore.setTokenContract(daoToken.target)).wait();
+  await (await daoCore.setPanicWallet(multisigPanic.target)).wait();
+  console.log("✔ Panic Wallet configurada");
   console.log("✔ DAO core configurado con staking, delegation y token");
 
   // 11) TRANSFERIR OWNERSHIP DEL DAO A MULTISIG

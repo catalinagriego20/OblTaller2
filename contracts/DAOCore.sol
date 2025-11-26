@@ -106,39 +106,12 @@ contract DAOCore is Ownable {
     }
 
     modifier onlyMultisigPanicOwner() {
-        if (msg.sender != panicWallet) {
-            try IMultiSig(panicWallet).owners() returns (address[] memory owners) {
-                bool isOwner = false;
-                for (uint256 i = 0; i < owners.length; i++) {
-                    if (owners[i] == msg.sender) {
-                        isOwner = true;
-                        break;
-                    }
-                }
-                require(isOwner, "Not a panic multisig owner");
-            } catch {
-                revert("Owner is not a multisig contract");
-            }
-        }
+        require(msg.sender == panicWallet, "Solo la Multisig Panico puede ejecutar esto");
         _;
     }
 
     modifier onlyMultisigOwner() {
-        address ownerAddr = owner();
-        if (msg.sender != ownerAddr) {
-            try IMultiSig(ownerAddr).owners() returns (address[] memory owners) {
-                bool isOwner = false;
-                for (uint256 i = 0; i < owners.length; i++) {
-                    if (owners[i] == msg.sender) {
-                        isOwner = true;
-                        break;
-                    }
-                }
-                require(isOwner, "Not a multisig owner");
-            } catch {
-                revert("Owner is not a multisig contract");
-            }
-        }
+        require(msg.sender == owner(), "Solo la Multisig Owner puede ejecutar esto");
         _;
     }
 

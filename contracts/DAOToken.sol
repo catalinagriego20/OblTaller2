@@ -37,21 +37,7 @@ contract DAOToken {
     }
 
     modifier onlyMultisigOwner() {
-        address ownerAddr = daoCore.owner();
-        if (msg.sender != ownerAddr) {
-            try IMultiSig(ownerAddr).owners() returns (address[] memory owners) {
-                bool isOwner = false;
-                for (uint256 i = 0; i < owners.length; i++) {
-                    if (owners[i] == msg.sender) {
-                        isOwner = true;
-                        break;
-                    }
-                }
-                require(isOwner, "Not a multisig owner");
-            } catch {
-                revert("Owner is not a multisig contract");
-            }
-        }
+        require(msg.sender == daoCore.owner(), "Solo la Multisig Owner puede ejecutar esto");
         _;
     }
 

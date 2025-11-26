@@ -128,4 +128,21 @@ contract SimpleMultiSig {
     function owners() public view returns (address[] memory) {
         return _owners;
     }
+
+    function getTransaction(uint256 _txIndex) public view returns (
+        address to, 
+        uint256 value, 
+        bytes memory data, 
+        bool executed, 
+        uint8 numConfirmations
+    ) {
+        Transaction storage txn = _transactions[_txIndex];
+        return (
+            txn.to,
+            txn.value,
+            txn.data,
+            txn.executed,
+            confirmations(_txIndex)
+        );
+    }
 }
