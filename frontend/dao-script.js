@@ -103,8 +103,6 @@ function modalConfirm(text) {
   });
 }
 
-// --- FUNCIONES DE UTILIDAD PARA TOKENS (Decimales) ---
-
 const formatTokens = (baseUnits) => {
   const decimals = contractTokenDecimals || 18;
   if (!baseUnits) return "0";
@@ -194,12 +192,11 @@ async function loadABIs() {
     DAOViewsABI = views;
     SimpleMultiSigABI = multisig;
 
-    console.log("✅ ABIs cargados correctamente");
+    console.log("ABIs cargados correctamente");
     return true;
   } catch (error) {
-    console.error("❌ Error cargando ABIs:", error);
+    console.error("Error cargando ABIs:", error);
 
-    // ⬇️ REEMPLAZO SOLICITADO
     showToast("Error al cargar los ABIs. Verificá que los archivos existan en ./abis/", "warning");
 
     return false;
@@ -410,10 +407,16 @@ async function loadProposals() {
             </div>
 
             <div class="d-flex gap-2 mt-2 mt-md-0">
-              <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
-              <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
-              <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
-              <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
+              ${
+                status === 0
+                  ? `
+                  <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
+                  <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
+                  <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
+                  <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
+                `
+                  : ""
+              }
             </div>
 
           </div>
@@ -429,7 +432,7 @@ async function loadProposals() {
 
 async function vote(id, inFavor) {
   if (!daoCoreContract || !erc20TokenContract)
-    return showToast("❌ Conecta tu wallet y asegúrate de cargar el contrato del token.", "warning");
+    return showToast("Conecta tu wallet y asegúrate de cargar el contrato del token.", "danger");
 
   try {
     const amountStr = await modalInput("Tokens a stakear", "Ej: 1.5");
@@ -437,23 +440,23 @@ async function vote(id, inFavor) {
 
     const stake = parseTokens(amountStr);
     if (stake === 0n)
-      return showToast("Monto de stake inválido o cero.", "warning");
+      return showToast("Monto de stake inválido o cero.", "danger");
 
     const stakingAddr = await daoCoreContract.staking();
     if (!stakingAddr || stakingAddr === ethers.ZeroAddress)
-      return showToast("❌ El contrato de Staking no está configurado correctamente.", "warning");
+      return showToast("El contrato de Staking no está configurado correctamente.", "danger");
 
     const confirmApprove = await modalConfirm(`Se solicitará aprobación para usar ${amountStr} tokens. ¿Continuar?`);
     if (!confirmApprove) return;
 
     const approveTx = await erc20TokenContract.approve(stakingAddr, stake);
     await approveTx.wait();
-    showToast("✅ Aprobación exitosa. Enviando voto...", "warning");
+    showToast("Aprobación exitosa. Enviando voto...", "info");
 
     const tx = await daoCoreContract.vote(id, inFavor, stake);
     await tx.wait();
 
-    showToast("✅ Voto registrado con éxito", "warning");
+    showToast("Voto registrado con éxito", "success");
     await loadProposals();
     await loadUserBalance();
 
@@ -464,12 +467,12 @@ async function vote(id, inFavor) {
 
 async function finalizeProposal(id) {
   if (!daoCoreContract)
-    return showToast("❌ Conecta tu wallet para finalizar", "warning");
+    return showToast("Conecta tu wallet para finalizar", "danger");
 
   try {
     const tx = await daoCoreContract.finalize(id);
     await tx.wait();
-    showToast("Propuesta finalizada", "warning");
+    showToast("Propuesta finalizada", "success");
 
     await loadProposals();
     clearInputs(["unstakeProposalId"]);
@@ -502,12 +505,12 @@ function showDelegateModal(proposalId) {
 
 async function delegateVoteQuick(proposalId, delegateAddress, amountStr) {
   if (!daoDelegationContract)
-    return showToast("❌ Conecta tu wallet para delegar", "warning");
+    return showToast("Conecta tu wallet para delegar", "danger");
 
   try {
     const stake = parseTokens(amountStr);
     if (stake === 0n)
-      return showToast("Monto de delegación inválido o cero.", "warning");
+      return showToast("Monto de delegación inválido o cero.", "danger");
 
     const tx = await daoDelegationContract.delegateVote(
       safeBigIntFromInput(proposalId),
@@ -516,7 +519,7 @@ async function delegateVoteQuick(proposalId, delegateAddress, amountStr) {
     );
     await tx.wait();
 
-    showToast("✅ Voto delegado exitosamente", "warning");
+    showToast("Voto delegado exitosamente", "success");
     await loadProposals();
     clearInputs(["delegateProposalId", "delegateAddress", "delegateAmount"]);
 
@@ -525,7 +528,7 @@ async function delegateVoteQuick(proposalId, delegateAddress, amountStr) {
 
 async function voteWithDelegation(proposalId) {
   if (!daoDelegationContract)
-    return showToast("❌ Conecta tu wallet para votar con delegación", "warning");
+    return showToast("Conecta tu wallet para votar con delegación", "danger");
 
   const delegatorAddr = await modalInput("Dirección del delegador", "0x...");
   if (!delegatorAddr) return;
@@ -540,7 +543,7 @@ async function voteWithDelegation(proposalId) {
     );
     await tx.wait();
 
-    showToast("Voto con delegación registrado", "warning");
+    showToast("Voto con delegación registrado", "success");
     await loadProposals();
     clearInputs(["voteWithDelegationProposalId", "delegatorAddress"]);
 
@@ -549,13 +552,13 @@ async function voteWithDelegation(proposalId) {
 
 async function revokeDelegation(proposalId) {
   if (!daoDelegationContract)
-    return showToast("❌ Conecta tu wallet para revocar", "warning");
+    return showToast("Conecta tu wallet para revocar", "danger");
 
   try {
     const tx = await daoDelegationContract.revokeDelegation(proposalId);
     await tx.wait();
 
-    showToast("Delegación revocada", "warning");
+    showToast("Delegación revocada", "success");
     q("revokeProposalId").value = "";
 
   } catch (e) { alertErr(e); }
@@ -643,7 +646,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   q("btnCreateProp")?.addEventListener("click", async () => {
     if (!daoCoreContract || !erc20TokenContract)
-      return showToast("❌ Conecta tu wallet y asegúrate de cargar el contrato del token ERC20.", "warning");
+      return showToast("Conecta tu wallet y asegúrate de cargar el contrato del token ERC20.", "danger");
 
     let approveTx;
     let tx;
@@ -654,27 +657,26 @@ window.addEventListener("DOMContentLoaded", async () => {
       const stakeStr = q("propStake").value.trim();
 
       if (!title || !stakeStr)
-        return showToast("Título y stake requeridos.", "warning");
+        return showToast("Título y stake requeridos.", "danger");
 
       const stake = parseTokens(stakeStr);
       if (stake === 0n)
-        return showToast("Monto de stake inválido o cero.", "warning");
+        return showToast("Monto de stake inválido o cero.", "danger");
 
       const stakingAddr = await daoCoreContract.staking();
       if (!stakingAddr || stakingAddr === ethers.ZeroAddress) {
-        return showToast("❌ El contrato de Staking no está configurado en el DAOCore", "warning");
+        return showToast("El contrato de Staking no está configurado en el DAOCore", "danger");
       }
 
-      showToast(`Aprobando ${stakeStr} tokens para el contrato de Staking...`, "warning");
 
       approveTx = await erc20TokenContract.approve(stakingAddr, stake);
       await approveTx.wait();
 
-      showToast("✅ Aprobación exitosa. Creando propuesta...", "warning");
+      showToast("Aprobación exitosa. Creando propuesta...", "info");
 
       tx = await daoCoreContract.createProposal(title, desc, stake);
       await tx.wait();
-      showToast("✅ Propuesta creada", "warning");
+      showToast("Propuesta creada", "success");
 
       clearInputs(["propTitle", "propDesc", "propStake"]);
 
@@ -687,17 +689,17 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   q("btnBuy")?.addEventListener("click", async () => {
     if (!daoTokenContract)
-      return showToast("❌ Conecta tu wallet para comprar tokens", "warning");
+      return showToast("Conecta tu wallet para comprar tokens", "danger");
 
     try {
       const eth = q("buyEth").value;
-      if (!eth) return showToast("Ingrese ETH", "warning");
+      if (!eth) return showToast("Ingrese ETH", "danger");
 
       const value = ethers.parseEther(eth);
       const tx = await daoTokenContract.buyTokens({ value });
 
       await tx.wait();
-      showToast("✅ Tokens comprados", "warning");
+      showToast("Tokens comprados", "success");
 
       await loadUserBalance();
       clearInputs(["buyEth"]);
@@ -707,52 +709,52 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 q("btnActivatePanic")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para activar pánico", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para activar pánico", "danger");
 
   try {
     const tx = await daoCoreContract.panic();
     await tx.wait();
-    showToast("🚨 PÁNICO ACTIVADO", "warning");
+    showToast("🚨 PÁNICO ACTIVADO", "success");
     await initDAO();
   } catch (e) { alertErr(e); }
 });
 
 q("btnRestoreNormal")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para restaurar", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para restaurar", "danger");
 
   try {
     const tx = await daoCoreContract.tranquility();
     await tx.wait();
-    showToast("🕊 Tranquilidad restaurada", "warning");
+    showToast("🕊 Tranquilidad restaurada", "success");
     await initDAO();
   } catch (e) { alertErr(e); }
 });
 
 q("btnMint")?.addEventListener("click", async () => {
-  if (!daoTokenContract) return showToast("❌ Conecta tu wallet para mintear", "warning");
+  if (!daoTokenContract) return showToast("Conecta tu wallet para mintear", "danger");
 
   try {
     const amountStr = q("mintAmount").value;
-    if (!amountStr) return showToast("Ingrese amount", "warning");
+    if (!amountStr) return showToast("Ingrese amount", "danger");
 
     const amount = parseTokens(amountStr);
-    if (amount === 0n) return showToast("Monto inválido o cero.", "warning");
+    if (amount === 0n) return showToast("Monto inválido o cero.", "danger");
 
     const tx = await daoTokenContract.mintTokens(amount);
     await tx.wait();
 
-    showToast(`✅ Tokens minteados: ${amountStr} tokens`, "warning");
+    showToast(`Tokens minteados: ${amountStr} tokens`, "success");
     await loadUserBalance();
     clearInputs(["mintAmount"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnCheckStakes")?.addEventListener("click", async () => {
-  if (!daoViewsContract) return showToast("❌ Conecta tu wallet para consultar staking", "warning");
+  if (!daoViewsContract) return showToast("Conecta tu wallet para consultar staking", "danger");
 
   try {
     const addr = q("addrToCheck").value.trim();
-    if (!addr) return showToast("Ingrese una dirección", "warning");
+    if (!addr) return showToast("Ingrese una dirección", "danger");
 
     const balance = await daoViewsContract.getUserTokenBalance(addr);
     const staking = await daoViewsContract.getUserStaking(addr);
@@ -781,7 +783,7 @@ q("btnCheckStakes")?.addEventListener("click", async () => {
 });
 
 q("btnUpdateParams")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para actualizar parámetros", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para actualizar parámetros", "danger");
 
   try {
     const price = q("paramPrice").value.trim();
@@ -792,7 +794,7 @@ q("btnUpdateParams")?.addEventListener("click", async () => {
     const lockTime = q("paramLockTime").value.trim();
 
     if (!price || !minVote || !minProp || !votingPeriod || !tokensPerVP || !lockTime) {
-      return showToast("Complete todos los campos de parámetros", "warning");
+      return showToast("Complete todos los campos de parámetros", "danger");
     }
 
     const tx = await daoCoreContract.updateParams(
@@ -805,84 +807,84 @@ q("btnUpdateParams")?.addEventListener("click", async () => {
     );
     await tx.wait();
 
-    showToast("✅ Parámetros actualizados.", "warning");
+    showToast("Parámetros actualizados.", "success");
     await loadDAOCurrentParams();
   } catch (e) { alertErr(e); }
 });
 
 q("btnTransferOwner")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para transferir ownership", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para transferir ownership", "danger");
 
   try {
     const newOwner = q("newOwnerAddr").value.trim();
-    if (!newOwner) return showToast("Ingrese una dirección", "warning");
+    if (!newOwner) return showToast("Ingrese una dirección", "danger");
 
     const tx = await daoCoreContract.changeOwner(newOwner);
     await tx.wait();
-    showToast("Ownership transferido", "warning");
+    showToast("Ownership transferido", "success");
     await initDAO();
     clearInputs(["newOwnerAddr"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnSetPanicWallet")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para configurar Panic Wallet", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para configurar Panic Wallet", "danger");
 
   try {
     const wallet = q("panicWalletAddr").value.trim();
-    if (!wallet) return showToast("Ingrese una dirección", "warning");
+    if (!wallet) return showToast("Ingrese una dirección", "danger");
 
     const tx = await daoCoreContract.setPanicWallet(wallet);
     await tx.wait();
-    showToast("Panic wallet configurada", "warning");
+    showToast("Panic wallet configurada", "success");
     await initDAO();
     clearInputs(["panicWalletAddr"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnUnstake")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para quitar stake", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para quitar stake", "danger");
 
   try {
     const proposalId = q("unstakeProposalId").value.trim();
-    if (!proposalId) return showToast("Ingrese un ID de propuesta", "warning");
+    if (!proposalId) return showToast("Ingrese un ID de propuesta", "danger");
 
     const tx = await daoCoreContract.unstakeProposal(safeBigIntFromInput(proposalId));
     await tx.wait();
-    showToast("Tokens desbloqueados de la propuesta", "warning");
+    showToast("Tokens desbloqueados de la propuesta", "success");
     await loadUserBalance();
     clearInputs(["unstakeProposalId"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnUnstakeVote")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para quitar stake", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para quitar stake", "danger");
 
   try {
     const proposalId = q("unstakeVoteId").value.trim();
-    if (!proposalId) return showToast("Ingrese un ID de propuesta", "warning");
+    if (!proposalId) return showToast("Ingrese un ID de propuesta", "danger");
 
     const tx = await daoCoreContract.unstakeVote(safeBigIntFromInput(proposalId));
     await tx.wait();
-    showToast("Tokens desbloqueados de la propuesta", "warning");
+    showToast("Tokens desbloqueados de la propuesta", "success");
     await loadUserBalance();
     clearInputs(["unstakeVoteId"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnToggleVotingMode")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("❌ Conecta tu wallet para cambiar el modo de votación", "warning");
+  if (!daoCoreContract) return showToast("Conecta tu wallet para cambiar el modo de votación", "danger");
 
   try {
     const tx = await daoCoreContract.toggleVotingMode();
     await tx.wait();
-    showToast("Modo de votación cambiado", "warning");
+    showToast("Modo de votación cambiado", "success");
     await updateVotingModeUI();
   } catch (e) { alertErr(e); }
 });
 
 q("btnDelegateVote")?.addEventListener("click", async () => {
-  if (!daoDelegationContract) return showToast("❌ Conecta tu wallet para delegar voto", "warning");
+  if (!daoDelegationContract) return showToast("Conecta tu wallet para delegar voto", "danger");
 
   try {
     const proposalId = q("delegateProposalId").value.trim();
@@ -890,7 +892,7 @@ q("btnDelegateVote")?.addEventListener("click", async () => {
     const amount = q("delegateAmount").value.trim();
 
     if (!proposalId || !delegateAddress || !amount) {
-      return showToast("Complete todos los campos de delegación", "warning");
+      return showToast("Complete todos los campos de delegación", "danger");
     }
 
     await delegateVoteQuick(safeBigIntFromInput(proposalId), delegateAddress, amount);
@@ -899,7 +901,7 @@ q("btnDelegateVote")?.addEventListener("click", async () => {
 });
 
 q("btnVoteWithDelegation")?.addEventListener("click", async () => {
-  if (!daoDelegationContract) return showToast("❌ Conecta tu wallet para votar con delegación", "warning");
+  if (!daoDelegationContract) return showToast("Conecta tu wallet para votar con delegación", "danger");
 
   try {
     const proposalId = q("voteWithDelegationProposalId").value.trim();
@@ -907,7 +909,7 @@ q("btnVoteWithDelegation")?.addEventListener("click", async () => {
     const inFavor = q("delegatedVoteChoice").value === "true";
 
     if (!proposalId || !delegatorAddr) {
-      return showToast("Complete ID de propuesta y Dirección del Delegador", "warning");
+      return showToast("Complete ID de propuesta y Dirección del Delegador", "danger");
     }
 
     const tx = await daoDelegationContract.voteWithDelegation(
@@ -916,35 +918,35 @@ q("btnVoteWithDelegation")?.addEventListener("click", async () => {
       inFavor
     );
     await tx.wait();
-    showToast("Voto con delegación registrado", "warning");
+    showToast("Voto con delegación registrado", "success");
     await loadProposals();
     clearInputs(["voteWithDelegationProposalId", "delegatorAddress"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnRevokeDelegation")?.addEventListener("click", async () => {
-  if (!daoDelegationContract) return showToast("❌ Conecta tu wallet para revocar delegación", "warning");
+  if (!daoDelegationContract) return showToast("Conecta tu wallet para revocar delegación", "danger");
 
   try {
     const proposalId = q("revokeProposalId").value.trim();
-    if (!proposalId) return showToast("Ingrese ID de propuesta", "warning");
+    if (!proposalId) return showToast("Ingrese ID de propuesta", "danger");
 
     const tx = await daoDelegationContract.revokeDelegation(safeBigIntFromInput(proposalId));
     await tx.wait();
-    showToast("Delegación revocada", "warning");
+    showToast("Delegación revocada", "success");
     clearInputs(["revokeProposalId"]);
   } catch (e) { alertErr(e); }
 });
 
 q("btnCheckDelegation")?.addEventListener("click", async () => {
-  if (!daoViewsContract) return showToast("❌ Conecta tu wallet para consultar delegación", "warning");
+  if (!daoViewsContract) return showToast("Conecta tu wallet para consultar delegación", "danger");
 
   try {
     const proposalId = q("checkDelegationProposalId").value.trim();
     const addr = q("checkDelegationAddress").value.trim();
 
     if (!proposalId || !addr) {
-      return showToast("Complete todos los campos", "warning");
+      return showToast("Complete todos los campos", "danger");
     }
 
     const [delegate, amount, active] = await daoViewsContract.getDelegationInfo(
@@ -974,4 +976,107 @@ q("btnCheckDelegation")?.addEventListener("click", async () => {
     }
 
   } catch (e) { alertErr(e); }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  q("filterStatus")?.addEventListener("change", async () => {
+    if (!daoViewsContract) return;
+
+    try {
+      const filter = q("filterStatus").value;
+      const list = q("proposalsList");
+      if (!list) return;
+
+      let proposals;
+
+      if (filter === "ALL") {
+        proposals = await daoViewsContract.getAllProposals();
+      } else {
+        const statusMap = { "ACTIVE": 0, "ACCEPTED": 1, "REJECTED": 2 };
+        proposals = await daoViewsContract.getProposalsByStatus(statusMap[filter]);
+      }
+
+      console.log("Filtro seleccionado:", filter, "→ Recibidas:", proposals);
+
+      list.innerHTML = "";
+
+      for (const [idx, p] of proposals.entries()) {
+        const id = p.id ?? idx + 1;
+        const title = p.title ?? "Sin título";
+        const description = p.description ?? "";
+        const votesFor = formatTokens(p.votesFor) ?? "0";
+        const votesAgainst = formatTokens(p.votesAgainst) ?? "0";
+        const status = Number(p.status);
+        const statusLabel = ["Activa", "Aprobada", "Rechazada"][status] || status;
+
+        let delegationBadge = "";
+        if (currentAccount && daoViewsContract) {
+          try {
+            const [delegate, amount, active] =
+              await daoViewsContract.getDelegationInfo(id, currentAccount);
+
+            if (active && delegate !== ethers.ZeroAddress) {
+              delegationBadge = `<span class="delegation-badge">🤝 Delegado a ${fmtAddr(delegate)}</span>`;
+            }
+          } catch (e) {
+            console.log("Error al verificar delegación:", e);
+          }
+        }
+
+        const el = document.createElement("div");
+        el.className = "card mb-3 el-propuesta shadow-sm";
+
+        el.innerHTML = `
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1 d-flex align-items-center gap-2">
+                  <b>${title}</b>
+                  <span class="text-muted small">#${id}</span>
+                  ${delegationBadge}
+                </h5>
+
+                <p class="mt-2 mb-0">
+                  <span class="fw-bold">Descripción:</span>
+                  <span class="text-muted">${description}</span>
+                </p>
+              </div>
+
+              <span class="estado-propuesta bg-${status === 0 ? 'primary' : status === 1 ? 'success' : 'danger'}">
+                ${statusLabel}
+              </span>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap mt-3">
+              <div class="d-flex gap-4 flex-wrap">
+                <div class="info-box">🟩 Votos a favor: <strong>${votesFor}</strong></div>
+                <div class="info-box">🟥 Votos en contra: <strong>${votesAgainst}</strong></div>
+              </div>
+
+              <div class="d-flex gap-2 mt-2 mt-md-0">
+                ${
+                  status === 0
+                    ? `
+                    <button class="btn btn-sm btn-success" onclick="window.vote(${id}, true)">✅ A favor</button>
+                    <button class="btn btn-sm btn-danger" onclick="window.vote(${id}, false)">❌ En contra</button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.finalizeProposal(${id})">🏁 Finalizar</button>
+                    <button class="btn btn-sm btn-info" onclick="window.showDelegateModal(${id})">🤝 Delegar</button>
+                  `
+                    : ""
+                }
+              </div>
+            </div>
+          </div>
+        `;
+
+        list.appendChild(el);
+      }
+    } catch (e) {
+      alertErr(e);
+    }
+  });
+
 });
