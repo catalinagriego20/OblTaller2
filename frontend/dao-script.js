@@ -671,51 +671,80 @@ window.showDaoParamsModal = async () => {
 window.loadMultisigPendingTxs = async () => {
   if (!daoCoreContract || !currentAccount) return;
 
-  const list = q("multisigPendingList");
-  list.innerHTML = "<p class='text-center'>Cargando...</p>";
+  const list = document.getElementById("multisigPendingList");
+  if (!list) return;
+
+  list.innerHTML = "<div class='d-flex justify-content-center my-3'><div class='spinner-border text-primary'></div></div>";
 
   try {
-    // Obtenemos la dirección del Multisig Owner
+    // Obtenemos direcciones de ambas multisigs
     const ownerAddr = await daoCoreContract.owner();
-    
-    // Instancia del contrato Multisig
-    const msigContract = new ethers.Contract(ownerAddr, SimpleMultiSigABI, signer);
-    
-    const count = await msigContract.transactionCount();
-    const req = await msigContract._requiredConfirmations();
-    
-    let htmlItems = "";
-    
-    // Iteramos hacia atrás para mostrar las más recientes primero
-    for (let i = Number(count) - 1; i >= 0; i--) {
-        // Llamada a la función que DEBES agregar en el contrato Solidity
-        const txData = await msigContract.getTransaction(i);
-        
-        // txData tiene: [to, value, data, executed, numConfirmations]
-        const isExecuted = txData[3]; // o txData.executed
-        const currentConfs = txData[4]; // o txData.numConfirmations
+    const panicAddr = await daoCoreContract.panicWallet();
 
-        if (isExecuted) continue; // Omitir las ya ejecutadas
+    // Función auxiliar para obtener TXs de una multisig específica
+    const fetchTxs = async (msigAddr, label, badgeClass) => {
+      const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, provider); // Provider para lectura
+      const count = await msig.transactionCount();
+      const req = await msig._requiredConfirmations();
+      let items = "";
 
-        htmlItems += `
-          <div class="alert alert-info d-flex justify-content-between align-items-center mb-2">
-            <div>
-              <strong>TX #${i}</strong> <span class="badge bg-secondary">Pendiente</span><br>
-              <small>Confirmaciones: <b>${currentConfs}/${req}</b></small>
+      // Iteramos hacia atrás
+      for (let i = Number(count) - 1; i >= 0; i--) {
+        try {
+          // REQUIERE: function getTransaction(...) en SimpleMultiSig.sol
+          const txData = await msig.getTransaction(i);
+          const isExecuted = txData[3];
+          const currentConfs = txData[4];
+
+          if (isExecuted) continue;
+
+          // Decodificar nombre de función para UX
+          let funcDesc = "Desconocida";
+          try {
+            // Intentar decodificar con ABI de Core o Token
+            let decoded = daoCoreContract.interface.parseTransaction({ data: txData[2] });
+            if (!decoded) decoded = daoTokenContract.interface.parseTransaction({ data: txData[2] });
+            if (decoded) funcDesc = decoded.name;
+          } catch (e) {}
+
+          const canExecute = Number(currentConfs) >= Number(req);
+
+          items += `
+            <div class="alert alert-light border shadow-sm mb-2">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <span class="badge ${badgeClass} mb-1">${label}</span>
+                  <strong>TX #${i}: ${funcDesc}</strong>
+                  <div class="small text-muted mt-1">
+                    Confirmaciones: <b>${currentConfs}/${req}</b>
+                  </div>
+                </div>
+                <div class="d-flex flex-column gap-1">
+                   <button onclick="window.confirmTx('${msigAddr}', ${i})" class="btn btn-sm btn-outline-primary">✍️ Confirmar</button>
+                   <button onclick="window.executeTx('${msigAddr}', ${i})" class="btn btn-sm btn-success" ${!canExecute ? 'disabled' : ''}>🚀 Ejecutar</button>
+                </div>
+              </div>
             </div>
-            <div class="d-flex gap-2">
-               <button onclick="window.confirmTx('${ownerAddr}', ${i})" class="btn btn-sm btn-warning">Confirmar</button>
-               <button onclick="window.executeTx('${ownerAddr}', ${i})" class="btn btn-sm btn-success" ${currentConfs < req ? 'disabled' : ''}>Ejecutar</button>
-            </div>
-          </div>
-        `;
-    }
-    
-    list.innerHTML = htmlItems || "<p class='text-center text-muted'>No hay transacciones pendientes.</p>";
-    
+          `;
+        } catch (err) {
+          console.warn(`Error cargando tx ${i} de ${label}`, err);
+        }
+      }
+      return items;
+    };
+
+    // Cargar ambas en paralelo
+    const [ownerTxs, panicTxs] = await Promise.all([
+      fetchTxs(ownerAddr, "OWNER DAO", "bg-primary"),
+      fetchTxs(panicAddr, "PÁNICO", "bg-danger")
+    ]);
+
+    const finalHtml = (ownerTxs + panicTxs) || "<p class='text-center text-muted my-3'>No hay transacciones pendientes.</p>";
+    list.innerHTML = finalHtml;
+
   } catch (e) {
-    console.error("Error cargando multisig:", e);
-    list.innerHTML = "<div class='alert alert-danger'>Error al cargar. Verifica que el contrato SimpleMultiSig tenga la función 'getTransaction'.</div>";
+    console.error("Error general cargando multisigs:", e);
+    list.innerHTML = "<div class='alert alert-danger'>Error cargando datos. Asegúrate de que los contratos están desplegados y tienen la función getTransaction.</div>";
   }
 };
 
@@ -734,13 +763,30 @@ window.confirmTx = async (msigAddr, id) => {
 window.executeTx = async (msigAddr, id) => {
     try {
         const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, signer);
-        const tx = await msig.executeTransaction(id);
-        showToast("⏳ Ejecutando transacción...", "info");
+        
+        showToast("⏳ Enviando ejecución...", "info");
+
+        // 🚨 SOLUCIÓN CLAVE: Forzamos un gasLimit alto para evitar el error "estimateGas"
+        // Esto permite que la transacción se envíe aunque la estimación falle.
+        const tx = await msig.executeTransaction(id, { gasLimit: 6000000 }); 
+        
         await tx.wait();
-        showToast("🚀 Transacción ejecutada con éxito", "success");
+        
+        showToast("🚀 ¡Transacción ejecutada correctamente!", "success");
         await loadMultisigPendingTxs();
-        await loadDAOCurrentParams(); // Recargar datos de la DAO por si cambiaron
-    } catch(e) { alertErr(e); }
+        await loadDAOCurrentParams(); 
+        await loadUserBalance();
+
+    } catch(e) { 
+        console.error("Error en executeTx:", e);
+        // Intentamos mostrar el error real si la transacción falló on-chain
+        if (e.data) {
+             alertErr(e); 
+        } else {
+             // Si falla antes de enviar (y no es gas), mostramos mensaje genérico
+             showToast("Error al ejecutar. Verifica que tengas suficientes confirmaciones y seas owner.", "danger");
+        }
+    }
 };
 
 window.addEventListener("DOMContentLoaded", async () => {
