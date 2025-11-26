@@ -299,26 +299,26 @@ async function initDAO() {
     let isPanicked = false;
 
     try {
-      const pw = await daoCoreContract.panicWallet();
-      panicMsg += pw && pw !== ethers.ZeroAddress
-        ? `Panic wallet: ${fmtAddr(pw)} `
-        : `Panic wallet no configurada `;
-    } catch {}
-
-    try {
       isPanicked = await daoCoreContract.isPanicked();
       if (isPanicked) {
-        panicMsg += " - DAO en modo PÁNICO";
+        panicMsg += "DAO en modo PÁNICO";
 
-        document.querySelectorAll("button:not(#connectWalletBtn):not(#btnCheckDelegation):not(#btnCheckStakes):not(#btnShowParams)").forEach(
-          b => b.disabled = true
-        );
+        document.querySelectorAll(
+          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal)"
+        ).forEach(b => b.disabled = true);
+
         q("btnRestoreNormal").disabled = false;
         q("panicMsg").style.display = "block";
+        q("votingModeStatus").style.display = "none";
       } else {
+        document.querySelectorAll(
+          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal)"
+        ).forEach(b => b.disabled = false);
+
         setWalletUIVisible(true);
         setOwnerUIVisible(isOwner);
         q("panicMsg").style.display = "none";
+        q("votingModeStatus").style.display = "block";
       }
     } catch {
       q("panicMsg").style.display = "block";
