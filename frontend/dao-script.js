@@ -71,6 +71,47 @@ function showToast(message, type = "info") {
   el.addEventListener("hidden.bs.toast", () => el.remove());
 }
 
+// Función para enviar propuestas a la Multisig (Owner o Pánico)
+async function submitMultisigProposal(targetContractAddr, functionFragment, values, isPanic = false) {
+  if (!daoCoreContract) return showToast("Conecta tu wallet", "danger");
+
+  try {
+    // 1. Identificar qué multisig usar
+    const ownerAddr = await daoCoreContract.owner();
+    const panicAddr = await daoCoreContract.panicWallet();
+    const multisigAddr = isPanic ? panicAddr : ownerAddr;
+
+    // 2. Obtener instancia de la Multisig
+    const multisigContract = new ethers.Contract(multisigAddr, SimpleMultiSigABI, signer);
+
+    // 3. Codificar la llamada (Function Call Data)
+    // targetContractAddr: dirección del contrato a ejecutar (ej: DAOCore)
+    // functionFragment: string de la función (ej: "mintTokens(uint256)") o el objeto fragmento
+    // values: array de argumentos
+    
+    // Necesitamos la interfaz del contrato destino para codificar
+    let targetInterface;
+    if (targetContractAddr === await daoCoreContract.getAddress()) targetInterface = daoCoreContract.interface;
+    else if (targetContractAddr === await daoTokenContract.getAddress()) targetInterface = daoTokenContract.interface;
+    else return showToast("Contrato destino desconocido", "danger");
+
+    const data = targetInterface.encodeFunctionData(functionFragment, values);
+
+    // 4. Enviar transacción a submitTransaction del Multisig
+    // submitTransaction(address to, uint256 value, bytes data)
+    const tx = await multisigContract.submitTransaction(targetContractAddr, 0, data);
+    await tx.wait();
+
+    showToast("✅ Propuesta de transacción creada en la Multisig. Requiere confirmaciones.", "success");
+    
+    // Recargar lista
+    await loadMultisigPendingTxs();
+
+  } catch (e) {
+    alertErr(e);
+  }
+}
+
 function modalInput(title, placeholder = "", helpText = "") {
   return new Promise(resolve => {
     document.getElementById("modalInputTitle").textContent = title;
@@ -627,6 +668,81 @@ window.showDaoParamsModal = async () => {
   modal.show();
 };
 
+window.loadMultisigPendingTxs = async () => {
+  if (!daoCoreContract || !currentAccount) return;
+
+  const list = q("multisigPendingList");
+  list.innerHTML = "<p class='text-center'>Cargando...</p>";
+
+  try {
+    // Obtenemos la dirección del Multisig Owner
+    const ownerAddr = await daoCoreContract.owner();
+    
+    // Instancia del contrato Multisig
+    const msigContract = new ethers.Contract(ownerAddr, SimpleMultiSigABI, signer);
+    
+    const count = await msigContract.transactionCount();
+    const req = await msigContract._requiredConfirmations();
+    
+    let htmlItems = "";
+    
+    // Iteramos hacia atrás para mostrar las más recientes primero
+    for (let i = Number(count) - 1; i >= 0; i--) {
+        // Llamada a la función que DEBES agregar en el contrato Solidity
+        const txData = await msigContract.getTransaction(i);
+        
+        // txData tiene: [to, value, data, executed, numConfirmations]
+        const isExecuted = txData[3]; // o txData.executed
+        const currentConfs = txData[4]; // o txData.numConfirmations
+
+        if (isExecuted) continue; // Omitir las ya ejecutadas
+
+        htmlItems += `
+          <div class="alert alert-info d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <strong>TX #${i}</strong> <span class="badge bg-secondary">Pendiente</span><br>
+              <small>Confirmaciones: <b>${currentConfs}/${req}</b></small>
+            </div>
+            <div class="d-flex gap-2">
+               <button onclick="window.confirmTx('${ownerAddr}', ${i})" class="btn btn-sm btn-warning">Confirmar</button>
+               <button onclick="window.executeTx('${ownerAddr}', ${i})" class="btn btn-sm btn-success" ${currentConfs < req ? 'disabled' : ''}>Ejecutar</button>
+            </div>
+          </div>
+        `;
+    }
+    
+    list.innerHTML = htmlItems || "<p class='text-center text-muted'>No hay transacciones pendientes.</p>";
+    
+  } catch (e) {
+    console.error("Error cargando multisig:", e);
+    list.innerHTML = "<div class='alert alert-danger'>Error al cargar. Verifica que el contrato SimpleMultiSig tenga la función 'getTransaction'.</div>";
+  }
+};
+
+// Funciones globales para los botones
+window.confirmTx = async (msigAddr, id) => {
+    try {
+        const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, signer);
+        const tx = await msig.confirmTransaction(id);
+        showToast("⏳ Confirmando transacción...", "info");
+        await tx.wait();
+        showToast("✅ Transacción confirmada", "success");
+        await loadMultisigPendingTxs();
+    } catch(e) { alertErr(e); }
+};
+
+window.executeTx = async (msigAddr, id) => {
+    try {
+        const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, signer);
+        const tx = await msig.executeTransaction(id);
+        showToast("⏳ Ejecutando transacción...", "info");
+        await tx.wait();
+        showToast("🚀 Transacción ejecutada con éxito", "success");
+        await loadMultisigPendingTxs();
+        await loadDAOCurrentParams(); // Recargar datos de la DAO por si cambiaron
+    } catch(e) { alertErr(e); }
+};
+
 window.addEventListener("DOMContentLoaded", async () => {
 
   console.log("DOM listo. Cargando ABIs...");
@@ -745,44 +861,35 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 q("btnActivatePanic")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("Conecta tu wallet para activar pánico", "danger");
-
-  try {
-    const tx = await daoCoreContract.panic();
-    await tx.wait();
-    showToast("🚨 PÁNICO ACTIVADO", "success");
-    await initDAO();
-  } catch (e) { alertErr(e); }
+  await submitMultisigProposal(
+    await daoCoreContract.getAddress(),
+    "panic",
+    [],
+    true // isPanic = true
+  );
 });
 
 q("btnRestoreNormal")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("Conecta tu wallet para restaurar", "danger");
-
-  try {
-    const tx = await daoCoreContract.tranquility();
-    await tx.wait();
-    showToast("🕊 Tranquilidad restaurada", "success");
-    await initDAO();
-  } catch (e) { alertErr(e); }
+  await submitMultisigProposal(
+    await daoCoreContract.getAddress(),
+    "tranquility",
+    [],
+    true // isPanic = true
+  );
 });
 
+// Mint (A través de Multisig)
 q("btnMint")?.addEventListener("click", async () => {
-  if (!daoTokenContract) return showToast("Conecta tu wallet para mintear", "danger");
-
-  try {
-    const amountStr = q("mintAmount").value;
-    if (!amountStr) return showToast("Ingrese amount", "danger");
-
-    const amount = parseTokens(amountStr);
-    if (amount === 0n) return showToast("Monto inválido o cero.", "danger");
-
-    const tx = await daoTokenContract.mintTokens(amount);
-    await tx.wait();
-
-    showToast(`Tokens minteados: ${amountStr} tokens`, "success");
-    await loadUserBalance();
-    clearInputs(["mintAmount"]);
-  } catch (e) { alertErr(e); }
+  const amountStr = q("mintAmount").value;
+  if (!amountStr) return showToast("Ingrese amount", "danger");
+  const amount = parseTokens(amountStr);
+  
+  // Llamamos a submitMultisigProposal en vez de daoToken.mintTokens directo
+  await submitMultisigProposal(
+    await daoTokenContract.getAddress(), 
+    "mintTokens", 
+    [amount]
+  );
 });
 
 q("btnCheckStakes")?.addEventListener("click", async () => {
@@ -833,18 +940,13 @@ q("btnUpdateParams")?.addEventListener("click", async () => {
       return showToast("Complete todos los campos de parámetros", "danger");
     }
 
-    const tx = await daoCoreContract.updateParams(
-      parseWei(price),
-      parseTokens(minVote),
-      parseTokens(minProp),
-      safeBigIntFromInput(votingPeriod),
-      safeBigIntFromInput(tokensPerVP),
-      safeBigIntFromInput(lockTime)
+    const params = [ parseWei(price), parseTokens(minVote), /* ... resto de args ... */ ];
+    
+    await submitMultisigProposal(
+      await daoCoreContract.getAddress(),
+      "updateParams",
+      params
     );
-    await tx.wait();
-
-    showToast("Parámetros actualizados.", "success");
-    await loadDAOCurrentParams();
   } catch (e) { alertErr(e); }
 });
 
@@ -909,14 +1011,11 @@ q("btnUnstakeVote")?.addEventListener("click", async () => {
 });
 
 q("btnToggleVotingMode")?.addEventListener("click", async () => {
-  if (!daoCoreContract) return showToast("Conecta tu wallet para cambiar el modo de votación", "danger");
-
-  try {
-    const tx = await daoCoreContract.toggleVotingMode();
-    await tx.wait();
-    showToast("Modo de votación cambiado", "success");
-    await updateVotingModeUI();
-  } catch (e) { alertErr(e); }
+  await submitMultisigProposal(
+    await daoCoreContract.getAddress(),
+    "toggleVotingMode",
+    []
+  );
 });
 
 q("btnDelegateVote")?.addEventListener("click", async () => {
