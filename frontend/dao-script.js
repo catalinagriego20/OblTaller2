@@ -16,19 +16,29 @@ const fmtAddr = a => a ? `${a.slice(0,6)}...${a.slice(-4)}` : "-";
 const alertErr = e => {
   console.error(e);
 
-  const reason =
-    e.reason ||
-    e.shortMessage ||
-    e.error?.message ||
-    e.data?.message ||
-    e.data?.originalError?.message ||
-    e.body?.error?.message || 
-    e.message ||
-    "Transacción fallida";
+  let message = "Error desconocido";
 
-  showToast("Error: " + reason.replace("execution reverted: ", ""), "danger");
+  // Intentar obtener el mensaje de error de varias capas de Ethers v6 / RPC
+  if (e.reason) {
+    message = e.reason;
+  } else if (e.shortMessage) {
+    message = e.shortMessage;
+  } else if (e.info && e.info.error && e.info.error.message) {
+    message = e.info.error.message;
+  } else if (e.data && e.data.message) {
+    message = e.data.message;
+  } else if (e.message) {
+    message = e.message;
+  }
+
+  // Limpiar prefijos comunes de Hardhat/Metamask
+  const cleanMsg = message
+    .replace("execution reverted: ", "")
+    .replace("VM Exception while processing transaction: revert ", "")
+    .replace("unknown custom error", "Error personalizado desconocido (Revisar consola)");
+
+  showToast(`❌ Error: ${cleanMsg}`, "danger");
 };
-
 
 // 🌟 MEJORA 1: Nueva función para vaciar un conjunto de inputs 🌟
 function clearInputs(ids) {
