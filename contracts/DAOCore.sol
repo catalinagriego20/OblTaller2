@@ -105,6 +105,24 @@ contract DAOCore is Ownable {
         _;
     }
 
+    modifier onlyMultisigPanicOwner() {
+        if (msg.sender != panicWallet) {
+            try IMultiSig(panicWallet).owners() returns (address[] memory owners) {
+                bool isOwner = false;
+                for (uint256 i = 0; i < owners.length; i++) {
+                    if (owners[i] == msg.sender) {
+                        isOwner = true;
+                        break;
+                    }
+                }
+                require(isOwner, "Not a panic multisig owner");
+            } catch {
+                revert("Owner is not a multisig contract");
+            }
+        }
+        _;
+    }
+
     modifier onlyMultisigOwner() {
         address ownerAddr = owner();
         if (msg.sender != ownerAddr) {
@@ -210,14 +228,12 @@ contract DAOCore is Ownable {
         emit VotingModeToggled(votingMode);
     }
 
-    function panic() external panicConfigured {
-        require(msg.sender == panicWallet, "Only panic wallet can trigger panic");
+    function panic() external panicConfigured onlyMultisigPanicOwner {
         isPanicked = true;
         emit PanicTriggered();
     }
 
-    function tranquility() external panicConfigured {
-        require(msg.sender == panicWallet, "Only panic wallet can restore tranquility");
+    function tranquility() external panicConfigured onlyMultisigPanicOwner {
         isPanicked = false;
         emit TranquilityRestored();
     }
