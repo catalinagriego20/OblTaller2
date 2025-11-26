@@ -668,96 +668,92 @@ window.showDaoParamsModal = async () => {
   modal.show();
 };
 
-window.loadMultisigPendingTxs = async (filter = 'ALL') => {
+async function renderTxsInContainer(msigAddr, containerId, label, badgeClass) {
+  const list = document.getElementById(containerId);
+  if (!list) return; // Si el contenedor no existe en el HTML, no hacemos nada
+
+  // Si la dirección es 0x0 (no configurada), mostrar aviso
+  if (!msigAddr || msigAddr === ethers.ZeroAddress) {
+    list.innerHTML = `<div class="alert alert-warning small">⚠️ Wallet de ${label} no configurada.</div>`;
+    return;
+  }
+
+  list.innerHTML = "<div class='d-flex justify-content-center my-2'><div class='spinner-border spinner-border-sm text-secondary'></div></div>";
+
+  try {
+    const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, provider);
+    const count = await msig.transactionCount();
+    const req = await msig._requiredConfirmations();
+    
+    let html = "";
+    let hasPending = false;
+
+    // Recorrer transacciones (de la última a la primera)
+    for (let i = Number(count) - 1; i >= 0; i--) {
+      try {
+        const txData = await msig.getTransaction(i);
+        const isExecuted = txData[3];
+        const currentConfs = txData[4];
+
+        if (isExecuted) continue; // No mostrar ejecutadas
+        hasPending = true;
+
+        // Intentar decodificar nombre de la función
+        let funcDesc = "Desconocida";
+        try {
+          let decoded = daoCoreContract.interface.parseTransaction({ data: txData[2] });
+          if (!decoded) decoded = daoTokenContract.interface.parseTransaction({ data: txData[2] });
+          if (decoded) funcDesc = decoded.name;
+        } catch (e) {}
+
+        const canExecute = Number(currentConfs) >= Number(req);
+
+        html += `
+          <div class="alert alert-light border shadow-sm mb-2">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <span class="badge ${badgeClass} mb-1">${label}</span>
+                <strong>#${i}: ${funcDesc}</strong>
+                <div class="small text-muted mt-1">
+                  Confirmaciones: <b>${currentConfs}/${req}</b>
+                </div>
+              </div>
+              <div class="d-flex flex-column gap-1">
+                 <button onclick="window.confirmTx('${msigAddr}', ${i})" class="btn btn-sm btn-outline-primary">✍️ Firmar</button>
+                 <button onclick="window.executeTx('${msigAddr}', ${i})" class="btn btn-sm btn-success" ${!canExecute ? 'disabled' : ''}>🚀 Ejecutar</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        console.warn(`Error leyendo TX ${i} de ${label}`, err);
+      }
+    }
+
+    list.innerHTML = hasPending ? html : `<p class="text-muted text-center small my-3">No hay transacciones pendientes en ${label}.</p>`;
+
+  } catch (e) {
+    console.error(`Error cargando ${label}:`, e);
+    list.innerHTML = `<div class="alert alert-danger small">Error de conexión con el contrato.</div>`;
+  }
+}
+
+// Función principal que llama a los renderizadores individuales
+window.loadMultisigPendingTxs = async () => {
   if (!daoCoreContract || !currentAccount) return;
-
-  const list = document.getElementById("multisigPendingList");
-  if (!list) return;
-
-  list.innerHTML = "<div class='d-flex justify-content-center my-3'><div class='spinner-border text-primary'></div></div>";
 
   try {
     const ownerAddr = await daoCoreContract.owner();
     const panicAddr = await daoCoreContract.panicWallet();
 
-    const fetchTxs = async (msigAddr, label, badgeClass) => {
-      if (!msigAddr || msigAddr === ethers.ZeroAddress) return ""; // Ignorar si no está configurada
-
-      try {
-        const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, provider);
-        const count = await msig.transactionCount();
-        const req = await msig._requiredConfirmations();
-        let items = "";
-
-        for (let i = Number(count) - 1; i >= 0; i--) {
-          try {
-            const txData = await msig.getTransaction(i);
-            const isExecuted = txData[3];
-            const currentConfs = txData[4];
-
-            if (isExecuted) continue;
-
-            let funcDesc = "Desconocida";
-            try {
-              let decoded = daoCoreContract.interface.parseTransaction({ data: txData[2] });
-              if (!decoded) decoded = daoTokenContract.interface.parseTransaction({ data: txData[2] });
-              if (decoded) funcDesc = decoded.name;
-            } catch (e) {}
-
-            const canExecute = Number(currentConfs) >= Number(req);
-
-            items += `
-              <div class="alert alert-light border shadow-sm mb-2">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <span class="badge ${badgeClass} mb-1">${label}</span>
-                    <strong>TX #${i}: ${funcDesc}</strong>
-                    <div class="small text-muted mt-1">
-                      Confirmaciones: <b>${currentConfs}/${req}</b>
-                    </div>
-                  </div>
-                  <div class="d-flex flex-column gap-1">
-                     <button onclick="window.confirmTx('${msigAddr}', ${i})" class="btn btn-sm btn-outline-primary">✍️ Confirmar</button>
-                     <button onclick="window.executeTx('${msigAddr}', ${i})" class="btn btn-sm btn-success" ${!canExecute ? 'disabled' : ''}>🚀 Ejecutar</button>
-                  </div>
-                </div>
-              </div>
-            `;
-          } catch (err) {
-            console.warn(`Error leyendo TX ${i} de ${label}`, err);
-          }
-        }
-        return items;
-      } catch (err) {
-        console.error(`Error conectando a multisig ${label}`, err);
-        return `<div class="alert alert-danger mb-2">Error cargando ${label}</div>`;
-      }
-    };
-
-    // LÓGICA DE FILTRADO
-    let promises = [];
-
-    // Si es ALL o OWNER, cargamos la del Owner
-    if (filter === 'ALL' || filter === 'OWNER') {
-        promises.push(fetchTxs(ownerAddr, "OWNER DAO", "bg-primary"));
-    }
-
-    // Si es ALL o PANIC, cargamos la de Pánico
-    if (filter === 'ALL' || filter === 'PANIC') {
-        promises.push(fetchTxs(panicAddr, "PÁNICO", "bg-danger"));
-    }
-
-    // Esperamos a que todas las promesas seleccionadas se resuelvan
-    const results = await Promise.all(promises);
-    
-    // Unimos los resultados (strings HTML)
-    const finalHtml = results.join("") || "<p class='text-center text-muted my-3'>No hay transacciones pendientes para el filtro seleccionado.</p>";
-    
-    list.innerHTML = finalHtml;
+    // Ejecutamos ambas cargas en paralelo
+    await Promise.all([
+      renderTxsInContainer(ownerAddr, "ownerPendingList", "DAO", "bg-primary"),
+      renderTxsInContainer(panicAddr, "panicPendingList", "PÁNICO", "bg-danger")
+    ]);
 
   } catch (e) {
-    console.error("Error general:", e);
-    list.innerHTML = "<div class='alert alert-danger'>Error crítico cargando multisigs.</div>";
+    console.error("Error general en multisigs:", e);
   }
 };
 
