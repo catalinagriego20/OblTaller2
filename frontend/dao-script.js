@@ -677,74 +677,80 @@ window.loadMultisigPendingTxs = async () => {
   list.innerHTML = "<div class='d-flex justify-content-center my-3'><div class='spinner-border text-primary'></div></div>";
 
   try {
-    // Obtenemos direcciones de ambas multisigs
     const ownerAddr = await daoCoreContract.owner();
     const panicAddr = await daoCoreContract.panicWallet();
 
-    // Función auxiliar para obtener TXs de una multisig específica
     const fetchTxs = async (msigAddr, label, badgeClass) => {
-      const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, provider); // Provider para lectura
-      const count = await msig.transactionCount();
-      const req = await msig._requiredConfirmations();
-      let items = "";
+      // PROTECCIÓN: Si la dirección es 0x0, no intentar leer
+      if (!msigAddr || msigAddr === ethers.ZeroAddress) {
+        return `<div class="alert alert-warning mb-2"><small>⚠️ ${label} no configurada en el contrato</small></div>`;
+      }
 
-      // Iteramos hacia atrás
-      for (let i = Number(count) - 1; i >= 0; i--) {
-        try {
-          // REQUIERE: function getTransaction(...) en SimpleMultiSig.sol
-          const txData = await msig.getTransaction(i);
-          const isExecuted = txData[3];
-          const currentConfs = txData[4];
+      try {
+        const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, provider);
+        const count = await msig.transactionCount();
+        const req = await msig._requiredConfirmations();
+        let items = "";
 
-          if (isExecuted) continue;
-
-          // Decodificar nombre de función para UX
-          let funcDesc = "Desconocida";
+        for (let i = Number(count) - 1; i >= 0; i--) {
           try {
-            // Intentar decodificar con ABI de Core o Token
-            let decoded = daoCoreContract.interface.parseTransaction({ data: txData[2] });
-            if (!decoded) decoded = daoTokenContract.interface.parseTransaction({ data: txData[2] });
-            if (decoded) funcDesc = decoded.name;
-          } catch (e) {}
+            // Si falla aquí es porque falta getTransaction en el contrato
+            const txData = await msig.getTransaction(i);
+            const isExecuted = txData[3];
+            const currentConfs = txData[4];
 
-          const canExecute = Number(currentConfs) >= Number(req);
+            if (isExecuted) continue;
 
-          items += `
-            <div class="alert alert-light border shadow-sm mb-2">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <span class="badge ${badgeClass} mb-1">${label}</span>
-                  <strong>TX #${i}: ${funcDesc}</strong>
-                  <div class="small text-muted mt-1">
-                    Confirmaciones: <b>${currentConfs}/${req}</b>
+            // Decodificar info
+            let funcDesc = "Desconocida";
+            try {
+              let decoded = daoCoreContract.interface.parseTransaction({ data: txData[2] });
+              if (!decoded) decoded = daoTokenContract.interface.parseTransaction({ data: txData[2] });
+              if (decoded) funcDesc = decoded.name;
+            } catch (e) {}
+
+            const canExecute = Number(currentConfs) >= Number(req);
+
+            items += `
+              <div class="alert alert-light border shadow-sm mb-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <span class="badge ${badgeClass} mb-1">${label}</span>
+                    <strong>TX #${i}: ${funcDesc}</strong>
+                    <div class="small text-muted mt-1">
+                      Confirmaciones: <b>${currentConfs}/${req}</b>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-column gap-1">
+                     <button onclick="window.confirmTx('${msigAddr}', ${i})" class="btn btn-sm btn-outline-primary">✍️ Confirmar</button>
+                     <button onclick="window.executeTx('${msigAddr}', ${i})" class="btn btn-sm btn-success" ${!canExecute ? 'disabled' : ''}>🚀 Ejecutar</button>
                   </div>
                 </div>
-                <div class="d-flex flex-column gap-1">
-                   <button onclick="window.confirmTx('${msigAddr}', ${i})" class="btn btn-sm btn-outline-primary">✍️ Confirmar</button>
-                   <button onclick="window.executeTx('${msigAddr}', ${i})" class="btn btn-sm btn-success" ${!canExecute ? 'disabled' : ''}>🚀 Ejecutar</button>
-                </div>
               </div>
-            </div>
-          `;
-        } catch (err) {
-          console.warn(`Error cargando tx ${i} de ${label}`, err);
+            `;
+          } catch (err) {
+            console.warn(`Error leyendo TX ${i} de ${label}. Verifica getTransaction en Solidity.`, err);
+          }
         }
+        return items;
+      } catch (err) {
+        console.error(`Error conectando a multisig ${label} en ${msigAddr}`, err);
+        return `<div class="alert alert-danger mb-2">Error cargando ${label} (Ver consola)</div>`;
       }
-      return items;
     };
 
-    // Cargar ambas en paralelo
     const [ownerTxs, panicTxs] = await Promise.all([
       fetchTxs(ownerAddr, "OWNER DAO", "bg-primary"),
       fetchTxs(panicAddr, "PÁNICO", "bg-danger")
     ]);
 
+    // Si ambos strings están vacíos o son solo mensajes de alerta, mostrar "No hay pendientes"
     const finalHtml = (ownerTxs + panicTxs) || "<p class='text-center text-muted my-3'>No hay transacciones pendientes.</p>";
     list.innerHTML = finalHtml;
 
   } catch (e) {
     console.error("Error general cargando multisigs:", e);
-    list.innerHTML = "<div class='alert alert-danger'>Error cargando datos. Asegúrate de que los contratos están desplegados y tienen la función getTransaction.</div>";
+    list.innerHTML = "<div class='alert alert-danger'>Error crítico cargando multisigs.</div>";
   }
 };
 
