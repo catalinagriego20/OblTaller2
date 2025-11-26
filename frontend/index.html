@@ -49,7 +49,6 @@
       box-shadow: 0 6px 16px rgba(0,0,0,0.12);
     }
 
-    /* Estado en formato etiqueta, NO botón */
     .estado-propuesta {
       padding: 6px 12px;
       border-radius: 50px;
@@ -58,7 +57,6 @@
       font-size: 0.85rem;
     }
 
-    /* Cajas para los votos */
     .info-box {
       padding: 6px 12px;
       border-radius: 10px;
@@ -67,9 +65,20 @@
       font-size: 0.9rem;
     }
 
+    /* Estilos para toasts */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body class="p-4">
+  <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+  <!-- Contenedor de Toasts -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <div class="container">
     <div class="top-bar">
@@ -318,9 +327,9 @@
       <!-- TOKENS TAB -->
       <div class="tab-pane fade" id="tokens" role="tabpanel">
         <div class="card p-4 mt-3 bg-light">
-          <h4>Tu Balance de Tokens</h4>
-          <p class="mb-0">Balance actual: <strong id="userBalance">--</strong></p>
-        </div>
+          <h4>Tu Balance de Tokens</h4>
+          <p class="mb-0">Balance actual: <strong id="userBalance">--</strong></p>
+        </div>
 
         <div class="card p-4 mt-3">
           <h4>Comprar Tokens</h4>
@@ -358,6 +367,41 @@
         </div>
       </div>
 
+    </div>
+
+    <div class="modal fade" id="modalInput" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalInputTitle"></h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input id="modalInputField" type="text" class="form-control" />
+            <small id="modalInputHelp" class="text-muted"></small>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary" id="modalInputOk">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalConfirm" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirmación</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="modalConfirmText"></div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-danger" id="modalConfirmOk">Confirmar</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="modal fade" id="paramsModal" tabindex="-1" aria-labelledby="paramsModalLabel" aria-hidden="true">
