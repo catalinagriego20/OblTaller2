@@ -773,28 +773,23 @@ window.executeTx = async (msigAddr, id) => {
     try {
         const msig = new ethers.Contract(msigAddr, SimpleMultiSigABI, signer);
         
-        showToast("⏳ Enviando ejecución...", "info");
-
-        // 🚨 SOLUCIÓN CLAVE: Forzamos un gasLimit alto para evitar el error "estimateGas"
-        // Esto permite que la transacción se envíe aunque la estimación falle.
+        // Gas limit manual para evitar errores de estimación en llamadas internas
         const tx = await msig.executeTransaction(id, { gasLimit: 6000000 }); 
         
+        showToast("⏳ Ejecutando transacción final...", "info");
         await tx.wait();
         
-        showToast("🚀 ¡Transacción ejecutada correctamente!", "success");
-        await loadMultisigPendingTxs();
-        await loadDAOCurrentParams(); 
-        await loadUserBalance();
-
+        showToast("🚀 ¡Ejecución Exitosa! Actualizando interfaz...", "success");
+        
+        // --- ACTUALIZACIÓN DE ESTADO COMPLETA ---
+        await loadMultisigPendingTxs(); // 1. Quitar la transacción de la lista
+        await initDAO();                // 2. IMPORTANTÍSIMO: Recargar estado de Pánico/Owner/Votación
+        await loadDAOCurrentParams();   // 3. Actualizar precios/tiempos si cambiaron
+        await loadUserBalance();        // 4. Actualizar balance si hubo mint
+        
     } catch(e) { 
-        console.error("Error en executeTx:", e);
-        // Intentamos mostrar el error real si la transacción falló on-chain
-        if (e.data) {
-             alertErr(e); 
-        } else {
-             // Si falla antes de enviar (y no es gas), mostramos mensaje genérico
-             showToast("Error al ejecutar. Verifica que tengas suficientes confirmaciones y seas owner.", "danger");
-        }
+        console.error(e);
+        alertErr(e); 
     }
 };
 
