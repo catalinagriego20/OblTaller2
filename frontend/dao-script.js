@@ -18,18 +18,23 @@ const fmtAddr = a => a ? `${a.slice(0,6)}...${a.slice(-4)}` : "-";
 const alertErr = e => {
   console.error(e);
 
+  const errorData = e.data || e.error?.data || e.payload?.error?.data || "";
+
+  if (errorData.includes("0xe450d38c")) {
+    return showToast("Error: Balance de tokens insuficiente para realizar esta operación.", "danger");
+  }
+  
+  if (errorData.includes("0xfb8f41b2")) {
+    return showToast("Error: Permiso (allowance) de tokens insuficiente.", "danger");
+  }
 
   const reason =
     e.reason ||
     e.shortMessage ||
     e.error?.message ||
     e.data?.message ||
-    e.data?.originalError?.message ||
-    e.body?.error?.message ||
-    e.info?.error?.message ||
     e.message ||
     "Transacción fallida";
-
 
   showToast("Error: " + reason.replace("execution reverted: ", ""), "danger");
 };
@@ -1002,6 +1007,10 @@ q("btnCreateProp")?.addEventListener("click", async () => {
     if (stake === 0n)
       return showToast("Monto de stake inválido o cero.", "danger");
 
+    const balance = await erc20TokenContract.balanceOf(currentAccount);
+    if (balance < stake) {
+        return showToast(`Balance insuficiente. Tienes ${formatTokens(balance)} y necesitas ${stakeStr}.`, "danger");
+    }
 
     const stakingAddr = await daoCoreContract.staking();
     if (!stakingAddr || stakingAddr === ethers.ZeroAddress)
