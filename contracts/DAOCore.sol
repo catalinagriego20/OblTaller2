@@ -235,7 +235,7 @@ contract DAOCore is Ownable {
         staking.stakeProposal(msg.sender, stakingAmount, id);
     }
 
-function vote(uint256 id, bool inFavor, uint256 stakingAmount)
+    function vote(uint256 id, bool inFavor, uint256 stakingAmount)
         external
         notPanicked
         panicConfigured
@@ -244,7 +244,7 @@ function vote(uint256 id, bool inFavor, uint256 stakingAmount)
         require(stakingAmount >= minStakeForVote, "Insufficient voting stake");
         Proposal storage p = _proposals[id];
         require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
-        require(_isActive(id), "Not active");
+        require(_isActive(id), "Voting period ended");
 
         if (address(delegation) != address(0)) {
             require(!delegation.hasDelegated(id, msg.sender), "Already delegated vote for this proposal");
@@ -295,7 +295,7 @@ function vote(uint256 id, bool inFavor, uint256 stakingAmount)
         
         Proposal storage p = _proposals[id];
         require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
-        require(_isActive(id), "Not active");
+        require(_isActive(id), "Voting period ended");
         require(!p.voted[voter], "Already voted");
 
         p.voted[voter] = true;
