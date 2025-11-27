@@ -60,8 +60,8 @@ describe("Coverage Final - Edge Cases & Branches", function () {
     });
   });
 
-  describe("SimpleMultiSig.sol - Líneas 139,140 (ExecutionFailed)", function () {
-    it("Debe revertir con ExecutionFailed si la llamada externa falla", async function () {
+  describe("SimpleMultiSig.sol - Coverage Completo", function () {
+    it("Debe revertir con ExecutionFailed si la llamada externa falla (Líneas 139-140)", async function () {
       const callData = reverter.interface.encodeFunctionData("alwaysReverts");
 
       await multisig.submitTransaction(await reverter.getAddress(), 0, callData);
@@ -72,6 +72,16 @@ describe("Coverage Final - Edge Cases & Branches", function () {
       await expect(
         multisig.executeTransaction(0)
       ).to.be.revertedWithCustomError(multisig, "ExecutionFailed");
+    });
+
+    it("Debe cubrir getTransaction leyendo los datos de la transacción (Struct read)", async function () {
+      // Este test cubre las líneas donde se lee el struct Transaction
+      await multisig.submitTransaction(alice.address, 100, "0x");
+      const txInfo = await multisig.getTransaction(0);
+      
+      expect(txInfo.to).to.equal(alice.address);
+      expect(txInfo.value).to.equal(100);
+      expect(txInfo.executed).to.equal(false);
     });
   });
 
@@ -120,6 +130,57 @@ describe("Coverage Final - Edge Cases & Branches", function () {
       expect(voters).to.include(alice.address);
       expect(voters).to.include(charlie.address);
       expect(voters).to.not.include(bob.address);
+    });
+  });
+
+  describe("DAOCore - Math & Edge Cases", function () {
+    it("Debe proteger contra underflow en votesFor si cambian los parámetros", async function () {
+      await daoCore.updateParams(PRICE, MIN_STAKE_VOTE, MIN_STAKE_PROPOSAL, VOTING_PERIOD, 10n, LOCK_TIME);
+      
+      await daoCore.connect(alice).createProposal("UnderflowFor", "Desc", MIN_STAKE_PROPOSAL);
+      await daoCore.connect(bob).vote(1, true, 20n); 
+
+      await daoCore.updateParams(PRICE, MIN_STAKE_VOTE, MIN_STAKE_PROPOSAL, VOTING_PERIOD, 1n, LOCK_TIME);
+      
+      await daoCore.connect(bob).unstakeVote(1);
+      
+      const p = await daoCore.getProposal(1);
+      expect(p.votesFor).to.equal(0);
+    });
+
+    it("Debe proteger contra underflow en votesAgainst si cambian los parámetros", async function () {
+      await daoCore.updateParams(PRICE, MIN_STAKE_VOTE, MIN_STAKE_PROPOSAL, VOTING_PERIOD, 10n, LOCK_TIME);
+      
+      await daoCore.connect(alice).createProposal("UnderflowAgainst", "Desc", MIN_STAKE_PROPOSAL);
+      await daoCore.connect(bob).vote(1, false, 20n);
+
+      await daoCore.updateParams(PRICE, MIN_STAKE_VOTE, MIN_STAKE_PROPOSAL, VOTING_PERIOD, 1n, LOCK_TIME);
+
+      await daoCore.connect(bob).unstakeVote(1);
+
+      const p = await daoCore.getProposal(1);
+      expect(p.votesAgainst).to.equal(0);
+    });
+
+    it("Debe permitir votar cuando NO hay contrato de delegación configurado (Branch coverage)", async function () {
+      await daoCore.connect(alice).createProposal("NoDelegation", "Desc", MIN_STAKE_PROPOSAL);
+      
+      await expect(
+        daoCore.connect(bob).vote(1, true, MIN_STAKE_VOTE)
+      ).to.emit(daoCore, "Voted");
+    });
+  });
+
+  describe("DAOCore - View Functions", function () {
+    it("Debe cubrir la función getParams leyendo todos los valores", async function () {
+        const params = await daoCore.getParams();
+        
+        expect(params.priceWeiPerToken_).to.equal(PRICE);
+        expect(params.minStakeForVote_).to.equal(MIN_STAKE_VOTE);
+        expect(params.minStakeForProposal_).to.equal(MIN_STAKE_PROPOSAL);
+        expect(params.votingPeriod_).to.equal(VOTING_PERIOD);
+        expect(params.tokensPerVotingPower_).to.equal(TOKENS_PER_VP);
+        expect(params.lockTimeSeconds_).to.equal(LOCK_TIME);
     });
   });
 });
