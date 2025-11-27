@@ -1,4 +1,29 @@
+import { createWeb3Modal, defaultConfig } from 'https://esm.sh/@web3modal/ethers@5.0.2'
 import { CONTRACTS } from './dao-config.js';
+
+const projectId = '020d84e899581253a188b823482333bc';
+
+const ganache = {
+  chainId: 1337,
+  name: 'Ganache',
+  currency: 'ETH',
+  explorerUrl: 'https://etherscan.io',
+  rpcUrl: 'http://127.0.0.1:8545'
+}
+
+const metadata = {
+  name: 'Mi DAO',
+  description: 'DAO Dashboard',
+  url: window.location.origin,
+  icons: ['https://avatars.githubusercontent.com/u/37784886']
+}
+
+const modal = createWeb3Modal({
+  ethersConfig: defaultConfig({ metadata }),
+  chains: [ganache],
+  projectId,
+  enableAnalytics: false 
+})
 
 
 let provider, signer;
@@ -942,50 +967,54 @@ window.addEventListener("DOMContentLoaded", async () => {
   console.log("Inicializando listeners...");
 
 
-  q("connectWalletBtn")?.addEventListener("click", async () => {
+q("connectWalletBtn")?.addEventListener("click", async () => {
     try {
-      await window.ethereum.request({ method: "eth_requestAccounts" });
+      await modal.open();
+      
+      const walletProvider = modal.getWalletProvider();
 
+      if (!walletProvider) {
+          throw new Error("Seleccione una wallet");
+      }
 
-      provider = new ethers.BrowserProvider(window.ethereum);
+      provider = new ethers.BrowserProvider(walletProvider);
       signer = await provider.getSigner();
       currentAccount = await signer.getAddress();
-
 
       daoCoreContract = new ethers.Contract(CONTRACTS.daoCore, DAOCoreABI, signer);
       daoDelegationContract = new ethers.Contract(CONTRACTS.daoDelegation, DAODelegationABI, signer);
       daoTokenContract = new ethers.Contract(CONTRACTS.daoToken, DAOTokenABI, signer);
       daoViewsContract = new ethers.Contract(CONTRACTS.daoViews, DAOViewsABI, provider);
 
-
       q("connectWalletBtn").textContent = `Conectado: ${fmtAddr(currentAccount)}`;
       q("connectWalletBtn").classList.replace("btn-outline-primary","btn-success");
 
-
       try {
         const tokenAddr = await daoCoreContract.token();
-
-
         if (tokenAddr !== ethers.ZeroAddress) {
           const ercAbi = [
             "function decimals() view returns (uint8)",
             "function approve(address spender, uint256 amount) returns (bool)",
             "function balanceOf(address account) external view returns (uint256)"
           ];
-
-
           erc20TokenContract = new ethers.Contract(tokenAddr, ercAbi, signer);
           contractTokenDecimals = Number(await erc20TokenContract.decimals());
         }
       } catch (e) {
-        console.warn("No se pudieron obtener los decimales o el contrato del token. Asumiendo 18.", e);
+        console.warn("No se pudieron obtener los decimales. Asumiendo 18.", e);
         contractTokenDecimals = 18;
       }
 
-
       await initDAO();
-    } catch (e) { alertErr(e); }
-  });
+      showToast("Wallet conectada exitosamente", "success");
+
+    } catch (e) { 
+        console.error(e);
+        if (!e.message.includes("User rejected")) {
+            showToast(e.message, "info"); 
+        }
+    }
+});
 
 
 q("btnCreateProp")?.addEventListener("click", async () => {
