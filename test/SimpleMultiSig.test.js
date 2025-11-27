@@ -215,6 +215,27 @@ describe("SimpleMultiSig - Complete Coverage", function () {
         multiSig.connect(owner1).executeTransaction(1)
       ).to.be.reverted;
     });
+
+    it("Debe revertir si la ejecución de la transacción falla internamente", async () => {
+      const ReverterFactory = await ethers.getContractFactory("Reverter");
+      const reverter = await ReverterFactory.deploy();
+      await reverter.waitForDeployment();
+      
+      const callData = reverter.interface.encodeFunctionData("alwaysReverts");
+      
+      await multiSig.connect(owner1).submitTransaction(
+        await reverter.getAddress(),
+        0,
+        callData
+      );
+
+      await multiSig.connect(owner1).confirmTransaction(1); // ID 1 (asumiendo que es la segunda tx del test)
+      await multiSig.connect(owner2).confirmTransaction(1);
+
+      await expect(
+        multiSig.connect(owner1).executeTransaction(1)
+      ).to.be.revertedWithCustomError(multiSig, "ExecutionFailed");
+    });
   });
 
   describe("View Functions", function() {

@@ -188,6 +188,7 @@ describe("DAO Full Coverage", () => {
         await dao.connect(addr1).unstakeProposal(1);
     });
 
+    // --- CORRECCIONES APLICADAS ---
     it("finalize accepted", async () => {
         await dao.connect(addr1).createProposal("A", "B", 20);
         await dao.connect(addr1).vote(1, true, 20);
@@ -195,7 +196,8 @@ describe("DAO Full Coverage", () => {
         await ethers.provider.send("evm_increaseTime", [1000]);
         await ethers.provider.send("evm_mine");
 
-        await dao.finalize(1);
+        // Usamos addr1 (creador) para finalizar
+        await dao.connect(addr1).finalize(1);
         const p = (await daoViews.getAllProposals())[0];
         expect(p.status).to.equal(1);
     });
@@ -206,10 +208,12 @@ describe("DAO Full Coverage", () => {
         await ethers.provider.send("evm_increaseTime", [1000]);
         await ethers.provider.send("evm_mine");
 
-        await dao.finalize(1);
+        // Usamos addr1 (creador) para finalizar
+        await dao.connect(addr1).finalize(1);
         const p = (await daoViews.getAllProposals())[0];
         expect(p.status).to.equal(2);
     });
+    // ----------------------------
 
     it("finalize falla si no terminó periodo", async () => {
         await dao.connect(addr1).createProposal("A", "B", 20);

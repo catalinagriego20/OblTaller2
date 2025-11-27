@@ -394,4 +394,48 @@ describe("Staking - 100% Coverage", function () {
       expect(await staking.proposalUnlockTimeOf(creator.address, 1)).to.be.gt(0);
     });
   });
+  
+  describe("Coverage de Seguridad y Validaciones (Edge Cases)", function () {
+    // Cubre el modificador onlyDAO
+    it("Debe revertir si un usuario llama directamente a stakeVote (onlyDAO)", async () => {
+      await expect(
+        staking.connect(user).stakeVote(user.address, 100, 1)
+      ).to.be.revertedWith("Staking: not DAO");
+    });
+
+    it("Debe revertir si un usuario llama directamente a unstakeVote (onlyDAO)", async () => {
+      await expect(
+        staking.connect(user).unstakeVote(user.address, 1)
+      ).to.be.revertedWith("Staking: not DAO");
+    });
+
+    // Cubre validación de tiempo de bloqueo en unstakeVote
+    it("Debe revertir unstakeVote si el tiempo de bloqueo no ha pasado", async () => {
+      // Staking inicial
+      await mockDao.callStakeVote(user.address, 100, 1);
+      
+      // Intentar retirar inmediatamente (sin avanzar el tiempo)
+      // Esto fallará porque block.timestamp < unlockAt
+      await expect(
+        mockDao.callUnstakeVote(user.address, 1)
+      ).to.be.revertedWith("Locked stake");
+    });
+
+    // Cubre el require de que solo el creador puede hacer unstakeProposal
+    it("Debe revertir unstakeProposal si quien llama no es el creador original", async () => {
+      // Creador hace stake
+      await mockDao.callStakeProposal(creator.address, 100, 1);
+      
+      // Avanzamos el tiempo para que no falle por Locked Stake
+      await ethers.provider.send("evm_increaseTime", [4000]); 
+      await ethers.provider.send("evm_mine");
+
+      // Cambiamos el creador en el Mock para simular que otro usuario intenta retirar
+      await mockDao.setCreator(user.address); 
+
+      await expect(
+        mockDao.callUnstakeProposal(creator.address, 1)
+      ).to.be.revertedWith("Only proposal creator can unstake");
+    });
+  });
 });
