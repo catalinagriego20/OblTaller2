@@ -88,6 +88,7 @@ contract DAODelegation {
         });
         hasDelegated[proposalId][msg.sender] = true;
         
+        // FIX: Calcular votingPower y enviarlo al contrato de staking
         uint256 vp = _calculateVotingPower(amount);
         IStaking(daoCore.staking()).stakeVote(msg.sender, amount, proposalId, vp);
         
@@ -142,10 +143,10 @@ contract DAODelegation {
         uint8 votingMode = daoCore.votingMode();
         uint256 tokensPerVP = daoCore.tokensPerVotingPower();
         
-        if (votingMode == 1) {
+        if (votingMode == 1) { // QUADRATIC
             uint256 base = stakingAmount / tokensPerVP;
             return Math.sqrt(base);
-        } else {
+        } else { // LINEAR
             return stakingAmount / tokensPerVP;
         }
     }

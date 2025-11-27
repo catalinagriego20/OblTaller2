@@ -11,7 +11,7 @@ contract MockStaking {
     event StakedProposal(address indexed user, uint256 amount, uint256 proposalId);
     event UnstakedVote(address indexed user, uint256 proposalId);
     event UnstakedProposal(address indexed user, uint256 proposalId);
-    event VoteUnstaked(address indexed user, uint256 proposalId); // Alias for compatibility if needed
+    event VoteUnstaked(address indexed user, uint256 indexed proposalId);
 
     function stakeVote(address user, uint256 amount, uint256 proposalId, uint256 votingPower) external {
         voteStakes[user][proposalId] += amount;
@@ -29,7 +29,7 @@ contract MockStaking {
         voteStakes[user][proposalId] = 0;
         voteVotingPowers[user][proposalId] = 0;
         emit UnstakedVote(user, proposalId);
-        emit VoteUnstaked(user, proposalId); 
+        emit VoteUnstaked(user, proposalId);
     }
 
     function unstakeProposal(address user, uint256 proposalId) external {

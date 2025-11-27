@@ -8,17 +8,14 @@ describe("Staking - 100% Coverage", function () {
   beforeEach(async () => {
     [owner, user, creator, otherUser] = await ethers.getSigners();
 
-    // Deploy MockToken
     const MockToken = await ethers.getContractFactory("MockToken");
     token = await MockToken.deploy();
     await token.waitForDeployment();
 
-    // Deploy MockDAO
     const MockDAO = await ethers.getContractFactory("MockDAO");
     mockDao = await MockDAO.deploy();
     await mockDao.waitForDeployment();
 
-    // Deploy Staking
     const Staking = await ethers.getContractFactory("Staking");
     staking = await Staking.deploy(
       await token.getAddress(),
@@ -27,11 +24,9 @@ describe("Staking - 100% Coverage", function () {
     );
     await staking.waitForDeployment();
 
-    // Setup MockDAO
     await mockDao.setStaking(await staking.getAddress());
     await mockDao.setCreator(creator.address);
 
-    // Mint and approve tokens
     await token.mint(user.address, ethers.parseEther("10000"));
     await token.mint(creator.address, ethers.parseEther("10000"));
     await token.connect(user).approve(await staking.getAddress(), ethers.parseEther("10000"));
@@ -61,7 +56,6 @@ describe("Staking - 100% Coverage", function () {
 
   describe("Modifier onlyDAO", function () {
     it("should block non-DAO from calling stakeVote", async () => {
-      // FIX: Se envían 4 argumentos para coincidir con la firma del contrato
       await expect(
         staking.connect(user).stakeVote(user.address, 100, 1, 100)
       ).to.be.revertedWith("Staking: not DAO");
@@ -132,7 +126,6 @@ describe("Staking - 100% Coverage", function () {
       await mockDao.callStakeVote(user.address, 50, proposalId);
       
       expect(await staking.voteStakeOf(user.address, proposalId)).to.equal(150);
-      
       await mockDao.setLockTime(3600);
     });
 

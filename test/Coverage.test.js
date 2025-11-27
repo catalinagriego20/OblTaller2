@@ -75,7 +75,6 @@ describe("Coverage Final - Edge Cases & Branches", function () {
     });
 
     it("Debe cubrir getTransaction leyendo los datos de la transacción (Struct read)", async function () {
-      // Este test cubre las líneas donde se lee el struct Transaction
       await multisig.submitTransaction(alice.address, 100, "0x");
       const txInfo = await multisig.getTransaction(0);
       
@@ -181,6 +180,52 @@ describe("Coverage Final - Edge Cases & Branches", function () {
         expect(params.votingPeriod_).to.equal(VOTING_PERIOD);
         expect(params.tokensPerVotingPower_).to.equal(TOKENS_PER_VP);
         expect(params.lockTimeSeconds_).to.equal(LOCK_TIME);
+    });
+  });
+
+  describe("Staking.sol - Missing Views & Branches", function () {
+    let realStaking, mockToken, mockDaoContract;
+
+    beforeEach(async function () {
+      const MockToken = await ethers.getContractFactory("MockToken");
+      mockToken = await MockToken.deploy();
+      await mockToken.waitForDeployment();
+
+      const MockDAO = await ethers.getContractFactory("MockDAO");
+      mockDaoContract = await MockDAO.deploy();
+      await mockDaoContract.waitForDeployment();
+
+      const Staking = await ethers.getContractFactory("Staking");
+      realStaking = await Staking.deploy(
+        await mockToken.getAddress(),
+        await mockDaoContract.getAddress(),
+        charlie.address
+      );
+      await realStaking.waitForDeployment();
+
+      await mockDaoContract.setStaking(await realStaking.getAddress());
+      await mockToken.mint(alice.address, 1000);
+      await mockToken.connect(alice).approve(await realStaking.getAddress(), 1000);
+    });
+
+    it("Debe permitir llamadas desde daoDelegation (Branch: onlyDAO OR delegation)", async function () {
+      await expect(
+        realStaking.connect(charlie).stakeVote(alice.address, 100, 1, 100)
+      ).to.emit(realStaking, "VoteStaked");
+    });
+
+    it("Debe cubrir las View Functions faltantes (voteVotingPowerOf, voteStakedAt, proposalStakedAt)", async function () {
+       await mockDaoContract.callStakeVote(alice.address, 100, 1);
+       await mockDaoContract.setCreator(alice.address);
+       await mockDaoContract.callStakeProposal(alice.address, 100, 2);
+
+       const vp = await realStaking.voteVotingPowerOf(alice.address, 1);
+       const vTime = await realStaking.voteStakedAt(alice.address, 1);
+       const pTime = await realStaking.proposalStakedAt(alice.address, 2);
+
+       expect(vp).to.equal(100);
+       expect(vTime).to.be.gt(0);
+       expect(pTime).to.be.gt(0);
     });
   });
 });
