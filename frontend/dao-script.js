@@ -460,7 +460,7 @@ async function initDAO() {
 
 
         document.querySelectorAll(
-          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal)"
+          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal):not(#panicCard button)"
         ).forEach(b => b.disabled = true);
 
 
@@ -469,7 +469,7 @@ async function initDAO() {
         q("votingModeStatus").style.display = "none";
       } else {
         document.querySelectorAll(
-          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal)"
+          "button:not(#connectWalletBtn):not(#panic-tab):not(#btnRestoreNormal):not(#panicCard button)"
         ).forEach(b => b.disabled = false);
 
 
@@ -1325,39 +1325,64 @@ q("btnSetPanicWallet")?.addEventListener("click", async () => {
     );
   });
 
-
-
-
-
-
   q("btnDelegateVote")?.addEventListener("click", async () => {
-    if (!daoDelegationContract) return showToast("Conecta tu wallet para delegar voto", "danger");
-
+    if (!daoDelegationContract || !erc20TokenContract || !daoCoreContract)
+      return showToast("Conecta tu wallet antes de delegar voto", "danger");
 
     try {
       const proposalId = q("delegateProposalId").value.trim();
       const delegateAddress = q("delegateAddress").value.trim();
-      const amount = q("delegateAmount").value.trim();
+      const amountStr = q("delegateAmount").value.trim();
 
-
-      if (!proposalId || !delegateAddress || !amount) {
+      if (!proposalId || !delegateAddress || !amountStr)
         return showToast("Complete todos los campos de delegación", "danger");
-      }
 
+      const stake = parseTokens(amountStr);
+      if (stake === 0n)
+        return showToast("Monto de delegación inválido o cero.", "danger");
 
+      // --- obtener dirección del staking (igual que quick) ---
+      const stakingAddr = await daoCoreContract.staking();
+      if (!stakingAddr || stakingAddr === ethers.ZeroAddress)
+        return showToast("El contrato de Staking no está configurado correctamente.", "danger");
+
+      // --- confirmación opcional como quick ---
+      const confirmApprove = await modalConfirm(
+        `Se solicitará aprobación para usar ${amountStr} tokens en la delegación. ¿Continuar?`
+      );
+      if (!confirmApprove) return;
+
+      // --- aprobación ---
+      showToast("Aprobando tokens...", "info");
+
+      await safeTx(erc20TokenContract, "approve", [stakingAddr, stake]);
+
+      showToast("Aprobación exitosa. Delegando voto...", "info");
+
+      // --- delegación ---
       await safeTx(daoDelegationContract, "delegateVote", [
         safeBigIntFromInput(proposalId),
         delegateAddress,
-        parseTokens(amount)
+        stake,
       ]);
 
+      showToast("Voto delegado exitosamente", "success");
 
-      showToast("Delegación realizada", "success");
+      // --- refrescar datos ---
+      await loadProposals();
+      await loadUserBalance();
 
+      clearInputs([
+        "delegateProposalId",
+        "delegateAddress",
+        "delegateAmount"
+      ]);
 
-    } catch (e) {}
+    } catch (e) {
+      console.error(e);
+      showToast("Error al delegar voto", "danger");
+    }
   });
-
 
 
 
