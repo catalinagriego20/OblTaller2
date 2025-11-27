@@ -65,7 +65,6 @@ contract Staking {
         require(block.timestamp >= s.stakedAt + currentLockTime, "Locked stake");
 
         uint256 amount = s.amount;
-        
         s.amount = 0;
         s.votingPower = 0;
         s.exists = false;
@@ -127,5 +126,15 @@ contract Staking {
 
     function proposalStakedAt(address user, uint256 proposalId) external view returns (uint256) {
         return _proposalStakes[user][proposalId].stakedAt;
+    }
+
+    function voteUnlockTimeOf(address user, uint256 proposalId) external view returns (uint256) {
+        if (!_voteStakes[user][proposalId].exists) return 0;
+        return _voteStakes[user][proposalId].stakedAt + IDAO(daoCore).lockTime();
+    }
+
+    function proposalUnlockTimeOf(address user, uint256 proposalId) external view returns (uint256) {
+        if (!_proposalStakes[user][proposalId].exists) return 0;
+        return _proposalStakes[user][proposalId].stakedAt + IDAO(daoCore).lockTime();
     }
 }

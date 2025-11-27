@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 interface IStaking {
-    function stakeVote(address user, uint256 amount, uint256 proposalId) external;
+    function stakeVote(address user, uint256 amount, uint256 proposalId, uint256 votingPower) external;
     function unstakeVote(address user, uint256 proposalId) external;
     function stakeProposal(address user, uint256 amount, uint256 proposalId) external;
     function unstakeProposal(address user, uint256 proposalId) external;
@@ -42,9 +42,8 @@ contract MockDAO {
         return lockTimeValue;
     }
 
-    // Funciones wrapper para llamar al Staking desde el DAO
     function callStakeVote(address user, uint256 amount, uint256 proposalId) external {
-        IStaking(stakingContract).stakeVote(user, amount, proposalId);
+        IStaking(stakingContract).stakeVote(user, amount, proposalId, amount);
     }
 
     function callUnstakeVote(address user, uint256 proposalId) external {
