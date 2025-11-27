@@ -23,7 +23,6 @@ interface IDAOCore {
 
 contract DAOToken {
     IDAOCore public daoCore;
-
     event TokensPurchased(address indexed buyer, uint256 weiPaid, uint256 tokensMinted);
 
     modifier notPanicked() {
@@ -51,13 +50,16 @@ contract DAOToken {
         token.mint(address(this), amount);
     }
 
+    receive() external payable notPanicked panicConfigured {
+        _buyTokens(msg.sender, msg.value);
+    }
+
     function buyTokens() external payable notPanicked panicConfigured {
         _buyTokens(msg.sender, msg.value);
     }
 
     function _buyTokens(address buyer, uint256 weiAmount) internal {
         require(weiAmount > 0, "No ETH sent");
-        
         uint256 price = daoCore.priceWeiPerToken();
         require(price > 0, "Price not set");
 

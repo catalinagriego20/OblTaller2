@@ -22,7 +22,8 @@ describe("Staking - 100% Coverage", function () {
     const Staking = await ethers.getContractFactory("Staking");
     staking = await Staking.deploy(
       await token.getAddress(),
-      await mockDao.getAddress()
+      await mockDao.getAddress(),
+      otherUser.address
     );
     await staking.waitForDeployment();
 
@@ -40,20 +41,20 @@ describe("Staking - 100% Coverage", function () {
   describe("Constructor", function () {
     it("should deploy correctly with valid addresses", async () => {
       expect(await staking.token()).to.equal(await token.getAddress());
-      expect(await staking.dao()).to.equal(await mockDao.getAddress());
+      expect(await staking.daoCore()).to.equal(await mockDao.getAddress());
     });
 
     it("should revert with zero token address", async () => {
       const Staking = await ethers.getContractFactory("Staking");
       await expect(
-        Staking.deploy(ethers.ZeroAddress, await mockDao.getAddress())
+        Staking.deploy(ethers.ZeroAddress, await mockDao.getAddress(), otherUser.address)
       ).to.be.revertedWith("Invalid address");
     });
 
     it("should revert with zero dao address", async () => {
       const Staking = await ethers.getContractFactory("Staking");
       await expect(
-        Staking.deploy(await token.getAddress(), ethers.ZeroAddress)
+        Staking.deploy(await token.getAddress(), ethers.ZeroAddress, otherUser.address)
       ).to.be.revertedWith("Invalid address");
     });
   });
