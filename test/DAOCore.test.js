@@ -253,7 +253,7 @@ describe("DAOCore - Full Coverage", function () {
       
       await expect(
         daoCore.connect(bob).vote(1, true, Number(MIN_STAKE_VOTE))
-      ).to.be.revertedWith("Not active");
+      ).to.be.revertedWith("Voting period ended");
     });
   });
 

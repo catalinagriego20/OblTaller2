@@ -8,7 +8,7 @@ interface IMintableERC20 {
 }
 
 interface IStaking {
-    function stakeVote(address user, uint256 amount, uint256 proposalId) external;
+    function stakeVote(address user, uint256 amount, uint256 proposalId, uint256 votingPower) external;
     function unstakeVote(address user, uint256 proposalId) external;
 }
 
@@ -44,7 +44,7 @@ contract DAODelegation {
 
     modifier notPanicked() {
         require(!daoCore.isPanicked(), "Panic mode active");
-        _; 
+        _;
     }
 
     modifier panicConfigured() {
@@ -71,7 +71,6 @@ contract DAODelegation {
         require(delegate != address(0), "Invalid delegate");
         require(delegate != msg.sender, "Cannot delegate to yourself");
         require(amount >= daoCore.minStakeForVote(), "Insufficient delegation amount");
-        
         require(proposalId > 0 && proposalId <= daoCore.proposalCount(), "Invalid proposal");
         require(daoCore.isActive(proposalId), "Proposal not active");
         
@@ -80,17 +79,17 @@ contract DAODelegation {
         
         IMintableERC20 token = IMintableERC20(daoCore.token());
         require(token.balanceOf(msg.sender) >= amount, "Insufficient token balance");
-        
+
         voteDelegations[proposalId][msg.sender] = VoteDelegation({
             delegator: msg.sender,
             delegate: delegate,
             amount: amount,
             active: true
         });
-        
         hasDelegated[proposalId][msg.sender] = true;
         
-        IStaking(daoCore.staking()).stakeVote(msg.sender, amount, proposalId);
+        uint256 vp = _calculateVotingPower(amount);
+        IStaking(daoCore.staking()).stakeVote(msg.sender, amount, proposalId, vp);
         
         emit VoteDelegated(proposalId, msg.sender, delegate, amount);
     }
@@ -102,14 +101,12 @@ contract DAODelegation {
         onlyStakingSet
     {
         require(hasDelegated[proposalId][msg.sender], "No active delegation");
-        
         VoteDelegation storage delegation = voteDelegations[proposalId][msg.sender];
         require(delegation.active, "Delegation already used or revoked");
         
         require(!daoCore.hasVoted(proposalId, delegation.delegate), "Delegate already voted");
         
         delegation.active = false;
-        
         IStaking(daoCore.staking()).unstakeVote(msg.sender, proposalId);
         
         emit VoteDelegationRevoked(proposalId, msg.sender, delegation.delegate);
@@ -123,7 +120,6 @@ contract DAODelegation {
         returns (uint256)
     {
         require(hasDelegated[proposalId][delegator], "No delegation from this address");
-        
         VoteDelegation storage delegation = voteDelegations[proposalId][delegator];
         require(delegation.active, "Delegation not active");
         require(delegation.delegate == msg.sender, "Not the delegate");
@@ -131,13 +127,12 @@ contract DAODelegation {
         require(proposalId > 0 && proposalId <= daoCore.proposalCount(), "Invalid proposal");
         require(daoCore.isActive(proposalId), "Proposal not active");
         require(!daoCore.hasVoted(proposalId, msg.sender), "Delegate already voted");
-        
+
         uint256 stakingAmount = delegation.amount;
         uint256 vp = _calculateVotingPower(stakingAmount);
         require(vp > 0, "Zero voting power");
         
         delegation.active = false;
-        
         daoCore.recordDelegatedVote(proposalId, msg.sender, inFavor, vp);
         
         return vp;
@@ -147,10 +142,10 @@ contract DAODelegation {
         uint8 votingMode = daoCore.votingMode();
         uint256 tokensPerVP = daoCore.tokensPerVotingPower();
         
-        if (votingMode == 1) { // QUADRATIC
+        if (votingMode == 1) {
             uint256 base = stakingAmount / tokensPerVP;
             return Math.sqrt(base);
-        } else { // LINEAR
+        } else {
             return stakingAmount / tokensPerVP;
         }
     }
