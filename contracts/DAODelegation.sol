@@ -8,7 +8,7 @@ interface IMintableERC20 {
 }
 
 interface IStaking {
-    function stakeVote(address user, uint256 amount, uint256 proposalId, uint256 votingPower) external;
+    function stakeVote(address voter, uint256 amount, uint256 proposalId, uint256 votingPower) external;
     function unstakeVote(address user, uint256 proposalId) external;
 }
 
@@ -87,10 +87,8 @@ contract DAODelegation {
             active: true
         });
         hasDelegated[proposalId][msg.sender] = true;
-        
-        // FIX: Calcular votingPower y enviarlo al contrato de staking
-        uint256 vp = _calculateVotingPower(amount);
-        IStaking(daoCore.staking()).stakeVote(msg.sender, amount, proposalId, vp);
+
+        IStaking(daoCore.staking()).stakeVote(msg.sender, amount, proposalId, 0);
         
         emit VoteDelegated(proposalId, msg.sender, delegate, amount);
     }
