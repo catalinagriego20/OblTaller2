@@ -44,7 +44,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "unlockAt",
+        "name": "stakedAt",
         "type": "uint256"
       }
     ],
@@ -94,7 +94,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "unlockAt",
+        "name": "stakedAt",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "votingPower",
         "type": "uint256"
       }
     ],
@@ -183,7 +189,7 @@
         "type": "uint256"
       }
     ],
-    "name": "proposalUnlockTimeOf",
+    "name": "proposalStakedAt",
     "outputs": [
       {
         "internalType": "uint256",
@@ -232,6 +238,11 @@
       {
         "internalType": "uint256",
         "name": "proposalId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_votingPower",
         "type": "uint256"
       }
     ],
@@ -326,7 +337,31 @@
         "type": "uint256"
       }
     ],
-    "name": "voteUnlockTimeOf",
+    "name": "voteStakedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "proposalId",
+        "type": "uint256"
+      }
+    ],
+    "name": "voteVotingPowerOf",
     "outputs": [
       {
         "internalType": "uint256",

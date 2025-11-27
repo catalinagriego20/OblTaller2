@@ -1310,6 +1310,7 @@ q("btnSetPanicWallet")?.addEventListener("click", async () => {
 
       showToast("Tokens desbloqueados de la propuesta", "success");
       await loadUserBalance();
+      await loadProposals();
       clearInputs(["unstakeVoteId"]);
     } catch (e) {}
   });

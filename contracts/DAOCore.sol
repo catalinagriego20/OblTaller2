@@ -15,12 +15,13 @@ interface IMintableERC20 {
 }
 
 interface IStaking {
-    function stakeVote(address user, uint256 amount, uint256 proposalId) external;
+    function stakeVote(address user, uint256 amount, uint256 proposalId, uint256 votingPower) external;
     function stakeProposal(address user, uint256 amount, uint256 proposalId) external;
     function unstakeVote(address user, uint256 proposalId) external;
     function unstakeProposal(address user, uint256 proposalId) external;
     function voteStakeOf(address user, uint256 proposalId) external view returns (uint256);
     function proposalStakeOf(address user, uint256 proposalId) external view returns (uint256);
+    function voteVotingPowerOf(address user, uint256 proposalId) external view returns (uint256);
 }
 
 interface IMultiSig {
@@ -234,18 +235,17 @@ contract DAOCore is Ownable {
         staking.stakeProposal(msg.sender, stakingAmount, id);
     }
 
-    function vote(uint256 id, bool inFavor, uint256 stakingAmount)
+function vote(uint256 id, bool inFavor, uint256 stakingAmount)
         external
         notPanicked
         panicConfigured
         onlyStakingSet
     {
         require(stakingAmount >= minStakeForVote, "Insufficient voting stake");
-
         Proposal storage p = _proposals[id];
         require(p.id > 0 && p.id <= proposalCount, "Invalid proposal");
         require(_isActive(id), "Not active");
-        
+
         if (address(delegation) != address(0)) {
             require(!delegation.hasDelegated(id, msg.sender), "Already delegated vote for this proposal");
         }
@@ -262,7 +262,32 @@ contract DAOCore is Ownable {
 
         emit Voted(id, msg.sender, inFavor, vp);
 
-        staking.stakeVote(msg.sender, stakingAmount, id);
+        staking.stakeVote(msg.sender, stakingAmount, id, vp);
+    }
+
+    function unstakeVote(uint256 proposalId) external notPanicked onlyStakingSet panicConfigured {
+        Proposal storage p = _proposals[proposalId];
+        require(p.voted[msg.sender], "User did not vote");
+
+        uint256 vp = staking.voteVotingPowerOf(msg.sender, proposalId);
+
+        uint256 stakeAmount = staking.voteStakeOf(msg.sender, proposalId);
+        require(stakeAmount > 0, "No stake to unstake");
+        
+        if (p.voteChoice[msg.sender]) {
+            if (p.votesFor >= vp) p.votesFor -= vp;
+            else p.votesFor = 0;
+        } else {
+            if (p.votesAgainst >= vp) p.votesAgainst -= vp;
+            else p.votesAgainst = 0;
+        }
+
+        p.voted[msg.sender] = false;
+        delete p.voteChoice[msg.sender];
+
+        _removeVoter(p, msg.sender);
+        
+        staking.unstakeVote(msg.sender, proposalId);
     }
 
     function recordDelegatedVote(uint256 id, address voter, bool inFavor, uint256 votingPower) external notPanicked {
@@ -281,31 +306,6 @@ contract DAOCore is Ownable {
         else p.votesAgainst += votingPower;
 
         emit Voted(id, voter, inFavor, votingPower);
-    }
-
-    function unstakeVote(uint256 proposalId) external notPanicked onlyStakingSet panicConfigured {
-        Proposal storage p = _proposals[proposalId];
-        require(p.voted[msg.sender], "User did not vote");
-
-        uint256 stakeAmount = staking.voteStakeOf(msg.sender, proposalId);
-        require(stakeAmount > 0, "No stake to unstake");
-
-        uint256 vp = _calculateVotingPower(stakeAmount);
-
-        if (p.voteChoice[msg.sender]) {
-            if (p.votesFor >= vp) p.votesFor -= vp;
-            else p.votesFor = 0;
-        } else {
-            if (p.votesAgainst >= vp) p.votesAgainst -= vp;
-            else p.votesAgainst = 0;
-        }
-
-        p.voted[msg.sender] = false;
-        delete p.voteChoice[msg.sender];
-
-        _removeVoter(p, msg.sender);
-
-        staking.unstakeVote(msg.sender, proposalId);
     }
 
     function unstakeProposal(uint256 proposalId) external notPanicked onlyStakingSet panicConfigured {
