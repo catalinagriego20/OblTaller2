@@ -73,19 +73,14 @@ async function safeTx(contract, method, args = []) {
       throw err;
     }
 
-
     const tx = await contract[method](...args);
     return await tx.wait();
-
 
   } catch (e) {
     alertErr(e);
     throw e;
   }
 }
-
-
-
 
 function clearInputs(ids) {
   ids.forEach(id => {
@@ -169,6 +164,26 @@ async function submitMultisigProposal(targetContractAddr, functionFragment, valu
   }
 }
 
+async function forceTimestampUpdate() {
+  // Red real -> enviar transacción dummy
+  if (typeof network === "undefined") {
+    const tx = await signer.sendTransaction({ to: currentAccount, value: 0n });
+    return await tx.wait();
+  }
+
+  // Hardhat / Anvil
+  try {
+    await window.ethereum.request({
+      method: "evm_increaseTime",
+      params: [10]
+    });
+    await window.ethereum.request({
+      method: "evm_mine"
+    });
+  } catch (_) {
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
 
 function modalInput(title, placeholder = "", helpText = "") {
   return new Promise(resolve => {
@@ -654,8 +669,10 @@ async function finalizeProposal(id) {
   if (!daoCoreContract)
     return showToast("Conecta tu wallet para finalizar", "danger");
 
-
   try {
+
+    await forceTimestampUpdate();
+
     await safeTx(daoCoreContract, "finalize", [id]);
 
 
@@ -939,6 +956,7 @@ window.executeTx = async (msigAddr, id) => {
         await initDAO();                
         await loadDAOCurrentParams();  
         await loadUserBalance();      
+        await loadProposals();   
        
     } catch(e) {
         console.error(e);
@@ -1208,32 +1226,18 @@ q("btnCheckStakes")?.addEventListener("click", async () => {
         params
       );
 
-
-
-
-      showToast("Parámetros actualizados.", "success");
       await loadDAOCurrentParams();
     } catch (e) {
       alertErr(e);
     }
   });
 
-
-
-
   q("btnTransferOwner")?.addEventListener("click", async () => {
   if (!daoCoreContract) return showToast("Conecta tu wallet para transferir ownership", "danger");
-
-
-
 
   try {
     const newOwner = q("newOwnerAddr").value.trim();
     if (!newOwner) return showToast("Ingrese una dirección", "danger");
-
-
-
-
     const tx = await daoCoreContract.changeOwner(newOwner);
     await tx.wait();
     showToast("Ownership transferido", "success");
@@ -1283,9 +1287,9 @@ q("btnSetPanicWallet")?.addEventListener("click", async () => {
       const proposalId = q("unstakeProposalId").value.trim();
       if (!proposalId) return showToast("Ingrese un ID de propuesta", "danger");
 
-
+      await forceTimestampUpdate();
+      
       await safeTx(daoCoreContract, "unstakeProposal", [safeBigIntFromInput(proposalId)]);
-
 
       showToast("Tokens desbloqueados de la propuesta", "success");
       await loadUserBalance();
@@ -1299,17 +1303,18 @@ q("btnSetPanicWallet")?.addEventListener("click", async () => {
   q("btnUnstakeVote")?.addEventListener("click", async () => {
     if (!daoCoreContract) return showToast("Conecta tu wallet para quitar stake", "danger");
 
-
     try {
       const proposalId = q("unstakeVoteId").value.trim();
       if (!proposalId) return showToast("Ingrese un ID de propuesta", "danger");
 
+      await forceTimestampUpdate();
 
       await safeTx(daoCoreContract, "unstakeVote", [safeBigIntFromInput(proposalId)]);
 
 
       showToast("Tokens desbloqueados de la propuesta", "success");
       await loadUserBalance();
+      await loadProposals();
       clearInputs(["unstakeVoteId"]);
     } catch (e) {}
   });
