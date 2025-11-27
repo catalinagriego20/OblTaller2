@@ -201,4 +201,27 @@ describe("DAOToken - Full Coverage", function () {
       expect(await token.balanceOf(bob.address)).to.equal(expectedTokens2);
     });
   });
+
+  describe("Coverage: Receive y Validaciones de Compra", function() {
+    it("Debe permitir comprar tokens enviando ETH directamente al contrato (receive)", async function () {
+      const amount = ethers.parseEther("1");
+      
+      await expect(
+        alice.sendTransaction({
+          to: await daoToken.getAddress(),
+          value: amount
+        })
+      ).to.emit(daoToken, "TokensPurchased"); // Verifica que se emitió el evento
+    });
+
+    it("Debe revertir si el contrato DAOToken no tiene suficientes tokens para vender", async function () {
+      const DAOTokenFactory = await ethers.getContractFactory("DAOToken");
+      const emptyDaoToken = await DAOTokenFactory.deploy(await daoCore.getAddress());
+      await emptyDaoToken.waitForDeployment();
+      
+      await expect(
+        emptyDaoToken.connect(alice).buyTokens({ value: ethers.parseEther("1") })
+      ).to.be.revertedWith("Not enough tokens in DAO");
+    });
+  });
 });

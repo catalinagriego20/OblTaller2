@@ -316,6 +316,7 @@ contract DAOCore is Ownable {
         Proposal storage p = _proposals[id];
         require(p.status == ProposalStatus.ACTIVE, "Already finalized");
         require(block.timestamp > p.startTime + votingPeriod, "Voting period not ended");
+        require(_proposals[id].creator == msg.sender || msg.sender == owner(), "Only creator or owner can finalize");
 
         if (p.votesFor > p.votesAgainst) {
             p.status = ProposalStatus.ACCEPTED;

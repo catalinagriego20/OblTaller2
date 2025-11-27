@@ -278,4 +278,18 @@ describe("DAOViews - Full Coverage", function () {
       expect(proposals[0].status).to.equal(1); // ACCEPTED
     });
   });
+
+  describe("Coverage Branch: Sin contrato de delegación", function() {
+    it("Debe manejar correctamente getDelegationInfo cuando no hay contrato de delegación", async function () {
+      const DAOViews = await ethers.getContractFactory("DAOViews");
+      const viewsNoDelegation = await DAOViews.deploy(await daoCore.getAddress(), ethers.ZeroAddress);
+      await viewsNoDelegation.waitForDeployment();
+
+      const [delegate, amount, active] = await viewsNoDelegation.getDelegationInfo(1, alice.address);
+      
+      expect(delegate).to.equal(ethers.ZeroAddress);
+      expect(amount).to.equal(0n);
+      expect(active).to.equal(false);
+    });
+  });
 });
