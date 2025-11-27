@@ -65,7 +65,7 @@ async function main() {
   // 1) MULTISIG OWNER
   const SimpleMultiSig = await hre.ethers.getContractFactory("SimpleMultiSig");
   const owners = [owner1.address, owner2.address, owner3.address];
-  const requiredConfirmations = 1;
+  const requiredConfirmations = 2;
 
   const multisigOwner = await SimpleMultiSig.deploy(owners, requiredConfirmations);
   await multisigOwner.waitForDeployment();
